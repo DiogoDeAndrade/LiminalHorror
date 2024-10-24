@@ -138,7 +138,7 @@ public class WFCTilemap : MonoBehaviour
     [SerializeField, HideInInspector]
     private Tile[]          map;
     [SerializeField, ShowIf("hasAdjacencyData")]
-    private WFCTile3d[]     conflictTiles;
+    private List<WFCTile3d> conflictTiles;
 
     [SerializeField]
     private bool            drawGrid = false;
@@ -287,9 +287,17 @@ public class WFCTilemap : MonoBehaviour
                 Debug.LogWarning("Conflict found in propagation!");
                 probabilityMap[thisIndex] = null;
 
-                lastConflict.Add(tilePos);
-
-                ret = GenResult.Conflict;
+                if ((conflictTiles != null) && (conflictTiles.Count > 0))
+                {
+                    // Resolve this one - set map to one of the conflict tiles
+                    WFCTile3d tile = conflictTiles.Random();
+                    map[thisIndex] = new Tile() { tileId = tileset.GetTileIndex(tile), rotation = (byte)Random.Range(0, 3) };
+                }
+                else
+                {
+                    lastConflict.Add(tilePos);
+                    ret = GenResult.Conflict;
+                }
             }
         }
         else
