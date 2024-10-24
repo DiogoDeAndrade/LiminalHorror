@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using NaughtyAttributes;
 using System.IO;
+using Unity.AI.Navigation;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -123,6 +124,8 @@ public class WFCTilemap : MonoBehaviour
         }
     }
 
+    [SerializeField] 
+    private bool            initOnStart;
     [SerializeField, HideIf("hasAdjacencyData")]
     private TextAsset       tilemapData;
     [SerializeField, HideIf("hasData")]
@@ -164,7 +167,11 @@ public class WFCTilemap : MonoBehaviour
 
     private void Start()
     {
-        LoadTilemap();
+        if (initOnStart)
+        {
+            StartTilemap();
+            UpdateNavMesh();
+        }
     }
 
 
@@ -292,6 +299,7 @@ public class WFCTilemap : MonoBehaviour
                     // Resolve this one - set map to one of the conflict tiles
                     WFCTile3d tile = conflictTiles.Random();
                     map[thisIndex] = new Tile() { tileId = tileset.GetTileIndex(tile), rotation = (byte)Random.Range(0, 3) };
+                    UpdateMap(thisIndex);
                 }
                 else
                 {
@@ -557,6 +565,18 @@ public class WFCTilemap : MonoBehaviour
         foreach (var tile in tiles)
         {
             DestroyTile(tile);
+        }
+    }
+
+    void StartTilemap()
+    {
+        if (tilemapData != null)
+        {
+            LoadTilemap();
+        }
+        else if (adjacencyData != null)
+        {
+            GenerateFullMap();
         }
     }
 
@@ -867,6 +887,17 @@ public class WFCTilemap : MonoBehaviour
         AssetDatabase.Refresh();
     }
 #endif
+
+    [Button("Update Navmesh"), ShowIf("hasAdjacencyData")]
+    void UpdateNavMesh()
+    {
+        NavMeshSurface navMeshSurface = GetComponent<NavMeshSurface>();
+        if (navMeshSurface == null)
+        {
+            navMeshSurface = gameObject.AddComponent<NavMeshSurface>();
+            navMeshSurface.BuildNavMesh();
+        }
+    }
 
     private void OnDrawGizmosSelected()
     {

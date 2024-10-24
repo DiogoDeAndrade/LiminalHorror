@@ -8,6 +8,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1758967991630713161, guid: bc765b5b912542043809ed4c7dac2e9b, type: 3}
+      propertyPath: m_Size.y
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1758967991630713161, guid: bc765b5b912542043809ed4c7dac2e9b, type: 3}
+      propertyPath: m_Center.y
+      value: 1.25
+      objectReference: {fileID: 0}
     - target: {fileID: 3788222845242821050, guid: bc765b5b912542043809ed4c7dac2e9b, type: 3}
       propertyPath: m_Name
       value: BackroomFullCell Variant
