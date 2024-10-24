@@ -1,129 +1,15 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using NaughtyAttributes;
-using System.IO;
-using Unity.AI.Navigation;
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
+using System.IO;
+using Unity.AI.Navigation;
+using NaughtyAttributes;
 
 public class WFCTilemap : MonoBehaviour
 {
-    enum GenResult { Ok, Conflict, Complete };
-
-    [System.Serializable]
-    struct Tile
-    {
-        public byte tileId;
-        public byte rotation;
-
-        // Overload the == operator
-        public static bool operator ==(Tile lhs, Tile rhs)
-        {
-            // Compare each field for equality
-            return lhs.tileId == rhs.tileId && lhs.rotation == rhs.rotation;
-        }
-
-        // Overload the != operator
-        public static bool operator !=(Tile lhs, Tile rhs)
-        {
-            // Use the == operator to define !=
-            return !(lhs == rhs);
-        }
-
-        // Override Equals for structural equality comparison
-        public override bool Equals(object obj)
-        {
-            if (obj is Tile)
-            {
-                return this == (Tile)obj;
-            }
-            return false;
-        }
-
-        // Override GetHashCode for use in collections
-        public override int GetHashCode()
-        {
-            // Combine the hash codes of the fields
-            return tileId.GetHashCode() ^ rotation.GetHashCode();
-        }
-    }
-
-    enum Direction { PX = 0, PY = 1, PZ = 2, NX = 3, NY = 4, NZ = 5 };
-    const int maxDirection = 6;
-
-    class WFCData
-    {
-        public WFCData() 
-        { 
-            adjacency = new ProbList<Tile>[maxDirection];
-            for (int i = 0; i < maxDirection; i++) adjacency[i] = new();
-        }
-
-        ProbList<Tile>[] adjacency;
-
-        public void Add(Direction direction, Tile tile)
-        {
-            adjacency[(int)direction].Add(tile, 1);
-        }
-
-        internal void Save(BinaryWriter writer)
-        {
-            // For each direction (PX, PY, PZ, NX, NY, NZ)
-            for (int dir = 0; dir < maxDirection; dir++)
-            {
-                ProbList<Tile> tileProbs = adjacency[dir];
-
-                // Write the number of TileProbability entries for this direction
-                writer.Write(tileProbs.Count);
-
-                // Write each TileProbability's tileId and count
-                foreach (var tileProb in tileProbs)
-                {
-                    writer.Write(tileProb.element.tileId);     // Write the tileId
-                    writer.Write(tileProb.element.rotation);   // Write the rotation
-                    writer.Write(tileProb.count);              // Write the count
-                }
-            }
-        }
-
-        internal void Load(BinaryReader reader)
-        {
-            // For each direction (PX, PY, PZ, NX, NY, NZ)
-            for (int dir = 0; dir < maxDirection; dir++)
-            {
-                // Read the number of TileProbability entries for this direction
-                int tileProbCount = reader.ReadInt32();
-
-                // Clear the current list for this direction to prepare for new data
-                adjacency[dir] = new ProbList<Tile>();
-
-                // Read each TileProbability entry
-                for (int i = 0; i < tileProbCount; i++)
-                {
-                    // Read the tile's tileId and rotation
-                    Tile tile = new Tile
-                    {
-                        tileId = reader.ReadByte(),      // Read the tileId
-                        rotation = reader.ReadByte()     // Read the rotation
-                    };
-
-                    // Read the count
-                    int count = reader.ReadInt32();  // Read the count
-
-                    // Add the TileProbability to the list for this direction
-                    adjacency[dir].Add(tile, count);
-                }
-            }
-        }
-
-        internal ProbList<Tile> Get(Direction direction)
-        {
-            return adjacency[(int)direction];
-        }
-    }
-
     [SerializeField] 
     private bool            initOnStart;
     [SerializeField, HideIf("hasAdjacencyData")]
@@ -138,38 +24,43 @@ public class WFCTilemap : MonoBehaviour
     private Bounds          localBounds;
     [SerializeField]
     private WFCTileset      tileset;
-    [SerializeField, HideInInspector]
-    private Tile[]          map;
     [SerializeField, ShowIf("hasAdjacencyData")]
     private List<WFCTile3d> conflictTiles;
+
+    [SerializeField, ShowIf("hasAdjacencyData")]
+    private bool            dynamicUpdate;
+    [SerializeField, ShowIf("isDynamic")]
+    private Camera          dynamicCamera;
+    [SerializeField, ShowIf("isDynamic")]
+    private float           dynamicRadius;
+    [SerializeField, ShowIf("isDynamic")]
+    private Vector3Int      dynamicLimitStart;
+    [SerializeField, ShowIf("isDynamic")]
+    private Vector3Int      dynamicLimitEnd;
+
+    bool isDynamic => hasAdjacencyData && dynamicUpdate;
 
     [SerializeField]
     private bool            drawGrid = false;
     [SerializeField]
     private bool            drawDebugWFC = false;
 
-    private WFCTile3d[]     tileGameObjects;
-    ProbList<Tile>          uniqueTiles;
-    WFCData[]               adjacencyInfo;
-    ProbList<Tile>[]        probabilityMap;
-
     bool hasData => tilemapData != null;
     bool hasAdjacencyData => adjacencyData != null;
     bool hasAnyData => hasData || hasAdjacencyData;
 
-    Vector3Int              lastObservedPos = new Vector3Int(-1, -1, -1);
-    List<Vector3Int>        lastPropagatedPos = new List<Vector3Int>();
-    List<Vector3Int>        lastConflict = new List<Vector3Int>();
+    private WFCTileData     tilemap;
 
     private void Awake()
     {
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
         if (initOnStart)
         {
             StartTilemap();
+            yield return null;
             UpdateNavMesh();
         }
     }
@@ -188,18 +79,10 @@ public class WFCTilemap : MonoBehaviour
             {
                 for (int x = startPos.x; x < startPos.x + size.x; x++)
                 {
-                    int index = TilePosToIndex(x, y, z);
-                    DestroyTile(tileGameObjects[index]);
-                    tileGameObjects[index] = CreateTileAt(x, y, z, map[index]);
+                    tilemap.CreateTile(x, y, z);
                 }
             }
         }
-    }
-
-    void UpdateMap(int mapIndex)
-    {
-        DestroyTile(tileGameObjects[mapIndex]);
-        tileGameObjects[mapIndex] = CreateTileAt(IndexToTilePos(mapIndex), map[mapIndex]);
     }
 
     GenResult GenerateTilemap(Vector3Int startPos, Vector3Int size)
@@ -209,223 +92,10 @@ public class WFCTilemap : MonoBehaviour
         while (ret == GenResult.Ok)
         {
             // Select a tile, using a entropy measure
-            int mapIndex = GetLowestEntropyIndex(startPos, size);
-            if (mapIndex >= 0)
-            {
-                ret = GenerateTile(mapIndex);
-            }
-            else
-            {
-                ret = GenResult.Complete;
-            }
+            ret = tilemap.GenerateTile(startPos, size);
         }
 
         return ret;
-    }
-
-    GenResult GenerateTile(int index)
-    {
-        Vector3Int tilePos = IndexToTilePos(index);
-        lastObservedPos = tilePos;
-
-        Tile newTile = probabilityMap[index].Get();
-        if (newTile == null) return GenResult.Ok;
-
-        // Observe this map position
-        map[index] = newTile;
-
-        // Remove this, no need to keep the probability list
-        probabilityMap[index] = null;
-
-        // Now propagate
-        var ret = Propagate(tilePos, new ProbList<Tile>(newTile), true);
-
-        UpdateMap(index);
-
-        return ret;
-    }
-
-    private GenResult Propagate(Vector3Int tilePos, ProbList<Tile> tiles, bool force)
-    {
-        GenResult PropagateDir(Direction direction, Vector3Int delta)
-        {
-            ProbList<Tile> allowed = new();
-            foreach (var tile in tiles)
-            {
-                int uniqueId = uniqueTiles.IndexOf(tile.element);
-                allowed.Add(adjacencyInfo[uniqueId].Get(direction));
-            }
-            return Propagate(tilePos + delta, allowed, false);
-        }
-
-        GenResult   ret = GenResult.Ok;
-        bool        propagateFurther = false;
-
-        int thisIndex = TilePosToIndex(tilePos);
-        var pm = probabilityMap[thisIndex];
-        if (pm != null)
-        {
-            lastPropagatedPos.Add(tilePos);
-
-            // Check if something should be removed
-            foreach (var tc in pm)
-            {
-                if (tiles.IndexOf(tc.element) == -1)
-                {
-                    // This should be removed
-                    pm.Set(tc.element, 0);
-                    // We changed the list, need to propagate the change
-                    propagateFurther = true;
-                }
-                else
-                {
-                    pm.Set(tc.element, Mathf.Min(tc.count, pm.GetCount(tc.element)));
-                }
-            }
-
-            if (propagateFurther)
-            {
-                pm.Cleanup();
-            }
-
-            if (pm.Count == 0)
-            {
-                // this isn't collapsed, but there's no options, log conflict (for now)
-                Debug.LogWarning("Conflict found in propagation!");
-                probabilityMap[thisIndex] = null;
-
-                if ((conflictTiles != null) && (conflictTiles.Count > 0))
-                {
-                    // Resolve this one - set map to one of the conflict tiles
-                    WFCTile3d tile = conflictTiles.Random();
-                    map[thisIndex] = new Tile() { tileId = tileset.GetTileIndex(tile), rotation = (byte)Random.Range(0, 3) };
-                    UpdateMap(thisIndex);
-                }
-                else
-                {
-                    lastConflict.Add(tilePos);
-                    ret = GenResult.Conflict;
-                }
-            }
-        }
-        else
-        {
-            propagateFurther = force;
-        }
-
-        if (propagateFurther)
-        {
-            // Get all tiles allowed to the right (X+), and propagate that
-            if (tilePos.x < mapSize.x - 1)
-            {
-                if (PropagateDir(Direction.PX, Vector3Int.right) == GenResult.Conflict)
-                {
-                    ret = GenResult.Conflict;
-                }
-            }
-            // Left (X-)
-            if (tilePos.x > 0)
-            {
-                if (PropagateDir(Direction.NX, Vector3Int.left) == GenResult.Conflict)
-                {
-                    ret = GenResult.Conflict;
-                }
-            }
-            // Forward (Z+)
-            if (tilePos.z < mapSize.z - 1)
-            {
-                if (PropagateDir(Direction.PZ, Vector3Int.forward) == GenResult.Conflict)
-                {
-                    ret = GenResult.Conflict;
-                }
-            }
-            // Back (Z-)
-            if (tilePos.z > 0)
-            {
-                if (PropagateDir(Direction.NZ, Vector3Int.back) == GenResult.Conflict)
-                {
-                    ret = GenResult.Conflict;
-                }
-            }
-            // Up (Y+)
-            if (tilePos.y < mapSize.y - 1)
-            {
-                if (PropagateDir(Direction.PY, Vector3Int.up) == GenResult.Conflict)
-                {
-                    ret = GenResult.Conflict;
-                }
-            }
-            // Down (Y-)
-            if (tilePos.y > 0)
-            {
-                if (PropagateDir(Direction.NY, Vector3Int.down) == GenResult.Conflict)
-                {
-                    ret = GenResult.Conflict;
-                }
-            }
-        }
-
-        return ret;
-    }
-
-    int GetLowestEntropyIndex(Vector3Int startPos, Vector3Int size)
-    {
-        List<int>   possibilities = new List<int>();
-        int         minOptions = int.MaxValue;
-
-        for (int z = startPos.z; z < startPos.z + size.z; z++)
-        {
-            for (int y = startPos.y; y < startPos.y + size.y; y++)
-            {
-                for (int x = startPos.x; x < startPos.x + size.x; x++)
-                {
-                    int i = TilePosToIndex(x, y, z);
-                    if (probabilityMap[i] == null) continue;
-
-                    if (probabilityMap[i].Count < minOptions)
-                    {
-                        possibilities.Clear();
-                        possibilities.Add(i);
-                        minOptions = probabilityMap[i].Count;
-                    }
-                    else if (probabilityMap[i].Count == minOptions)
-                    {
-                        possibilities.Add(i);
-                    }
-                }
-            }
-        }
-
-        return (possibilities.Count > 0) ? (possibilities.Random()) : (-1);
-    }
-
-    WFCTile3d CreateTileAt(Vector3Int tilePos, Tile tile)
-    {
-        if (tile.tileId == 0) return null;
-
-        return CreateTileAt(tilePos.x, tilePos.y, tilePos.z, tile);
-    }
-
-    WFCTile3d CreateTileAt(int x, int y, int z, Tile tile)
-    {
-        if (tile.tileId == 0) return null;
-
-        var ret = Instantiate(tileset.GetTile(tile.tileId), transform);
-        ret.transform.position = GetWorldPos(x, y, z);
-        ret.transform.localRotation = Quaternion.Euler(0, 90 * tile.rotation, 0);
-
-        return ret;
-    }
-
-    void DestroyTile(WFCTile3d tile)
-    {
-        if (tile == null) return;
-#if UNITY_EDITOR
-        if (Application.isPlaying) Destroy(tile.gameObject);
-        else DestroyImmediate(tile.gameObject);
-#else
-            Destroy(tile.gameObject);
-#endif
     }
 
 #if UNITY_EDITOR
@@ -462,11 +132,7 @@ public class WFCTilemap : MonoBehaviour
         mapSize.y = Mathf.Max(1, Mathf.FloorToInt((localBounds.max.y - localBounds.min.y) / gridSize.y));
         mapSize.z = Mathf.Max(1, Mathf.FloorToInt((localBounds.max.z - localBounds.min.z) / gridSize.z));
 
-        map = new Tile[mapSize.x * mapSize.y * mapSize.z];
-        for (int i = 0; i < map.Length; i++)
-        {
-            map[i] = new Tile() { tileId = 0 };
-        }
+        tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -477,8 +143,7 @@ public class WFCTilemap : MonoBehaviour
             {
                 Tile t = new Tile() { tileId = tileset.GetTileIndex(prefabTile), rotation = GetRotation(tile) };
                 var  tilePos = WorldToTilePos(tile.GetExtents().center);   
-                var  tilePosIndex = TilePosToIndex(tilePos);
-                map[tilePosIndex] = t;
+                tilemap.Set(tilePos, t);
             }
         }
     }
@@ -560,11 +225,15 @@ public class WFCTilemap : MonoBehaviour
 
     void ClearTilemap()
     {
-        // Delete all subobjects
-        var tiles = GetComponentsInChildren<WFCTile3d>();
-        foreach (var tile in tiles)
+        var clusters = GetComponentsInChildren<WFCCluster>();
+        foreach (var c in clusters)
         {
-            DestroyTile(tile);
+#if UNITY_EDITOR
+            if (Application.isPlaying) Destroy(c.gameObject);
+            else DestroyImmediate(c.gameObject);
+#else
+            Destroy(c.gameObject);
+#endif
         }
     }
 
@@ -616,15 +285,14 @@ public class WFCTilemap : MonoBehaviour
             mapSize.z = reader.ReadInt32();
 
             // Initialize the map array with the correct size
-            map = new Tile[mapSize.x * mapSize.y * mapSize.z];
-            probabilityMap = null;
-            tileGameObjects = new WFCTile3d[map.Length];
+            tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
 
             // Read the tile data
-            for (int i = 0; i < map.Length; i++)
+            int tileCount = mapSize.x * mapSize.y * mapSize.z;
+            for (int i = 0; i < tileCount; i++)
             {
-                map[i].tileId = reader.ReadByte();
-                map[i].rotation = reader.ReadByte();
+                var tilePos = IndexToTilePos(i);
+                tilemap.Set(tilePos, new Tile { tileId = reader.ReadByte(), rotation = reader.ReadByte() });
             }
         }
 
@@ -634,22 +302,8 @@ public class WFCTilemap : MonoBehaviour
     [Button("Setup Tilemap"), ShowIf("hasAdjacencyData")]
     void SetupTilemap()
     {
-        lastObservedPos = new Vector3Int(-1, -1, -1);
-        lastPropagatedPos = new();
-        lastConflict = new();
-
         ClearTilemap();
         if (!LoadWFCData()) return;
-
-        // Create the probability map, if it doesn't exist
-        if (probabilityMap == null)
-        {
-            probabilityMap = new ProbList<Tile>[mapSize.x * mapSize.y * mapSize.z];
-            for (int i = 0; i < probabilityMap.Length; i++)
-            {
-                probabilityMap[i] = new ProbList<Tile>(uniqueTiles);
-            }
-        }
     }
 
 
@@ -669,45 +323,6 @@ public class WFCTilemap : MonoBehaviour
             case GenResult.Complete:
                 break;
         }
-    }
-
-    [Button("Generate next step"), ShowIf("hasAdjacencyData")]
-    void GenerateNextStep()
-    {
-        lastObservedPos = new Vector3Int(-1, -1, -1);
-        lastPropagatedPos = new();
-        lastConflict = new();
-
-        // Select a tile, using a entropy measure
-        int mapIndex = GetLowestEntropyIndex(Vector3Int.zero, mapSize);
-        if (mapIndex >= 0)
-        {
-            GenerateTile(mapIndex);
-        }
-    }
-
-    [SerializeField] private Tile       debugHardcodedTile;
-    [SerializeField] private Vector3Int debugHardcodedPos;
-
-    [Button("Generate hardcoded step"), ShowIf("hasAdjacencyData")]
-    void HardCodedStep()
-    {
-        SetupTilemap();
-
-        lastObservedPos = debugHardcodedPos;
-
-        int index = TilePosToIndex(debugHardcodedPos);
-
-        // Observe this map position
-        map[index] = debugHardcodedTile;
-
-        // Remove this, no need to keep the probability list
-        probabilityMap[index] = null;
-
-        // Now propagate
-        Propagate(debugHardcodedPos, new ProbList<Tile>(debugHardcodedTile), true);
-
-        UpdateMap(index);
     }
 
     bool LoadWFCData()
@@ -739,7 +354,7 @@ public class WFCTilemap : MonoBehaviour
 
             // Read unique tiles
             int uniqueTileCount = reader.ReadInt32();
-            uniqueTiles = new ProbList<Tile>();
+            var uniqueTiles = new ProbList<Tile>();
             for (int i = 0; i < uniqueTileCount; i++)
             {
                 Tile tile = new Tile();
@@ -751,7 +366,7 @@ public class WFCTilemap : MonoBehaviour
 
             // Read adjacency array
             int adjacencyLength = reader.ReadInt32();
-            adjacencyInfo = new WFCData[adjacencyLength];
+            var adjacencyInfo = new WFCData[adjacencyLength];
             for (int i = 0; i < adjacencyLength; i++)
             {
                 adjacencyInfo[i] = new WFCData();
@@ -759,9 +374,9 @@ public class WFCTilemap : MonoBehaviour
             }
 
             // Initialize the map array with the correct size
-            map = new Tile[mapSize.x * mapSize.y * mapSize.z];
-            probabilityMap = null;
-            tileGameObjects = new WFCTile3d[map.Length];
+            tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
+            tilemap.SetUniqueTiles(uniqueTiles);
+            tilemap.SetAdjacencyInfo(adjacencyInfo);
         }
 
         Debug.Log("Adjacency data loaded successfully!");
@@ -792,10 +407,13 @@ public class WFCTilemap : MonoBehaviour
             writer.Write(mapSize.z);
 
             // Loop through the map array and write each tile's data
-            for (int i = 0; i < map.Length; i++)
+            int tileCount = mapSize.x * mapSize.y * mapSize.z;
+            for (int i = 0; i < tileCount; i++)
             {
-                writer.Write(map[i].tileId);   // Write tileId
-                writer.Write(map[i].rotation); // Write rotation
+                var tilePos = IndexToTilePos(i);
+                var t = tilemap.GetTile(tilePos);
+                writer.Write(t.tileId);   // Write tileId
+                writer.Write(t.rotation); // Write rotation
             }
         }
 
@@ -810,11 +428,7 @@ public class WFCTilemap : MonoBehaviour
         BuildTilemap();
 
         // Get unique tiles
-        uniqueTiles = new ProbList<Tile>();
-
-        int strideX = 1;
-        int strideY = mapSize.x;
-        int strideZ = mapSize.x * mapSize.y;
+        var uniqueTiles = new ProbList<Tile>();
 
         for (int z = 0; z < mapSize.z; z++)
         {
@@ -822,14 +436,13 @@ public class WFCTilemap : MonoBehaviour
             {
                 for (int x = 0; x < mapSize.x; x++)
                 {
-                    int index = TilePosToIndex(x, y, z);
-                    uniqueTiles.Add(map[index], 1);
+                    uniqueTiles.Add(tilemap.GetTile(x, y, z), 1);
                 }
             }
         }
 
         // Build adjacency information
-        adjacencyInfo = new WFCData[uniqueTiles.Count];
+        var adjacencyInfo = new WFCData[uniqueTiles.Count];
         for (int i = 0; i < adjacencyInfo.Length; i++) adjacencyInfo[i] = new WFCData();
 
         for (int z = 0; z < mapSize.z; z++)
@@ -838,15 +451,14 @@ public class WFCTilemap : MonoBehaviour
             {
                 for (int x = 0; x < mapSize.x; x++)
                 {
-                    int index = TilePosToIndex(x, y, z);
-                    int uniqueId = uniqueTiles.IndexOf(map[index]);
+                    int uniqueId = uniqueTiles.IndexOf(tilemap.GetTile(x, y, z));
 
-                    if (x > 0) adjacencyInfo[uniqueId].Add(Direction.NX, map[index - strideX]);
-                    if (y > 0) adjacencyInfo[uniqueId].Add(Direction.NY, map[index - strideY]);
-                    if (z > 0) adjacencyInfo[uniqueId].Add(Direction.NZ, map[index - strideZ]);
-                    if (x < mapSize.x - 1) adjacencyInfo[uniqueId].Add(Direction.PX, map[index + strideX]);
-                    if (y < mapSize.y - 1) adjacencyInfo[uniqueId].Add(Direction.PY, map[index + strideY]);
-                    if (z < mapSize.z - 1) adjacencyInfo[uniqueId].Add(Direction.PZ, map[index + strideZ]);
+                    if (x > 0) adjacencyInfo[uniqueId].Add(Direction.NX, tilemap.GetTile(x - 1, y, z));
+                    if (y > 0) adjacencyInfo[uniqueId].Add(Direction.NY, tilemap.GetTile(x, y - 1, z));
+                    if (z > 0) adjacencyInfo[uniqueId].Add(Direction.NZ, tilemap.GetTile(x, y, z - 1));
+                    if (x < mapSize.x - 1) adjacencyInfo[uniqueId].Add(Direction.PX, tilemap.GetTile(x + 1, y, z));
+                    if (y < mapSize.y - 1) adjacencyInfo[uniqueId].Add(Direction.PY, tilemap.GetTile(x, y + 1, z));
+                    if (z < mapSize.z - 1) adjacencyInfo[uniqueId].Add(Direction.PZ, tilemap.GetTile(x, y, z + 1));
                 }
             }
         }
@@ -895,11 +507,66 @@ public class WFCTilemap : MonoBehaviour
         if (navMeshSurface == null)
         {
             navMeshSurface = gameObject.AddComponent<NavMeshSurface>();
-            navMeshSurface.BuildNavMesh();
+            navMeshSurface.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.PhysicsColliders;
+        }
+        navMeshSurface.BuildNavMesh();
+    }
+
+    [Button("Run update")]
+    private void Update()
+    {
+        if ((isDynamic) && (dynamicCamera))
+        {
+            Vector3[] corners = new Vector3[4];
+            dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), dynamicRadius, Camera.MonoOrStereoscopicEye.Mono, corners);
+
+            Vector3 min = dynamicCamera.transform.position;
+            Vector3 max = dynamicCamera.transform.position;
+            for (int i = 0; i < 4; i++)
+            {
+                corners[i] = dynamicCamera.transform.localToWorldMatrix.MultiplyPoint3x4(corners[i]);
+                if (corners[i].x < min.x) min.x = corners[i].x;
+                if (corners[i].y < min.y) min.y = corners[i].y;
+                if (corners[i].z < min.z) min.z = corners[i].z;
+                if (corners[i].x > max.x) max.x = corners[i].x;
+                if (corners[i].y > max.y) max.y = corners[i].y;
+                if (corners[i].z > max.z) max.z = corners[i].z;
+            }
+
+            Vector3Int p1 = WorldToTilePos(min);
+            Vector3Int p2 = WorldToTilePos(max);
+            Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
+            Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
+            if (start.x < dynamicLimitStart.x) start.x = dynamicLimitStart.x;
+            if (start.y < dynamicLimitStart.y) start.y = dynamicLimitStart.y;
+            if (start.z < dynamicLimitStart.z) start.z = dynamicLimitStart.z;
+            if (end.x > dynamicLimitEnd.x) end.x = dynamicLimitEnd.x;
+            if (end.y > dynamicLimitEnd.y) end.y = dynamicLimitEnd.y;
+            if (end.z > dynamicLimitEnd.z) end.z = dynamicLimitEnd.z;
+
+            int maxTilesPerFrame = 25;
+            bool updated = false;
+            for (int i = 0; i < maxTilesPerFrame; i++)
+            {
+                var err = tilemap.GenerateTile(start, end - start);
+                if ((err == GenResult.Ok) || (err == GenResult.Conflict))
+                {
+                    updated = true;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (updated)
+            {
+                UpdateNavMesh();
+            }
         }
     }
 
-    private void OnDrawGizmosSelected()
+    private void OnDrawGizmos()
     {
         if (hasAnyData)
         {
@@ -918,26 +585,47 @@ public class WFCTilemap : MonoBehaviour
         }
         if (drawDebugWFC)
         {
-            if (lastPropagatedPos != null)
-            {
-                Gizmos.color = new Color(0.0f, 0.25f, 0.0f, 1.0f);
-                foreach (var p in lastPropagatedPos)
-                {
-                    DrawGridPos(p);
-                }
-            }
-            if (lastConflict != null)
-            {
-                Gizmos.color = Color.red;
-                foreach (var p in lastConflict)
-                {
-                    DrawGridPos(p);
-                }
-            }
-            if (lastObservedPos.x != -1)
+            if ((isDynamic) && (dynamicCamera))
             {
                 Gizmos.color = Color.green;
-                DrawGridPos(lastObservedPos);
+                Gizmos.matrix = dynamicCamera.transform.localToWorldMatrix;
+                Gizmos.DrawFrustum(Vector3.zero, dynamicCamera.fieldOfView, dynamicRadius, 1.0f, 16.0f / 9.0f);
+
+                Vector3[] corners = new Vector3[4];
+                dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), dynamicRadius, Camera.MonoOrStereoscopicEye.Mono, corners);
+
+                Vector3 min = dynamicCamera.transform.position;
+                Vector3 max = dynamicCamera.transform.position;
+                for (int i = 0; i < 4; i++)
+                {
+                    corners[i] = dynamicCamera.transform.localToWorldMatrix.MultiplyPoint3x4(corners[i]);
+                    if (corners[i].x < min.x) min.x = corners[i].x;
+                    if (corners[i].y < min.y) min.y = corners[i].y;
+                    if (corners[i].z < min.z) min.z = corners[i].z;
+                    if (corners[i].x > max.x) max.x = corners[i].x;
+                    if (corners[i].y > max.y) max.y = corners[i].y;
+                    if (corners[i].z > max.z) max.z = corners[i].z;
+                }
+
+                Gizmos.matrix = Matrix4x4.identity;
+                Gizmos.color = new Color(1.0f, 0.5f, 0.2f, 1.0f);
+                Gizmos.DrawWireCube((min + max) * 0.5f, (max - min));
+
+                Gizmos.color = Color.red;
+                Vector3Int p1 = WorldToTilePos(min);
+                Vector3Int p2 = WorldToTilePos(max);
+                Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
+                Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
+
+                Gizmos.matrix = transform.localToWorldMatrix;
+
+                for (int z = start.z; z <= end.z; z++)
+                {
+                    for (int x = start.x; x <= end.x; x++)
+                    {
+                        DrawGridPos(new Vector3Int(x, 0, z));
+                    }
+                }
             }
         }
 
