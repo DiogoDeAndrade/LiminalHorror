@@ -34,9 +34,9 @@ public class WFCTilemap : MonoBehaviour
     [SerializeField, ShowIf("isDynamic")]
     private float           dynamicRadius;
     [SerializeField, ShowIf("isDynamic")]
-    private Vector3Int      dynamicLimitStart;
+    private Vector3Int      minMapLimit = new Vector3Int(-10000, 0, -10000);
     [SerializeField, ShowIf("isDynamic")]
-    private Vector3Int      dynamicLimitEnd;
+    private Vector3Int      maxMapLimit = new Vector3Int(-10000, 1, -10000);
 
     bool isDynamic => hasAdjacencyData && dynamicUpdate;
 
@@ -133,6 +133,7 @@ public class WFCTilemap : MonoBehaviour
         mapSize.z = Mathf.Max(1, Mathf.FloorToInt((localBounds.max.z - localBounds.min.z) / gridSize.z));
 
         tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
+        tilemap.SetLimits(minMapLimit, maxMapLimit);
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -286,6 +287,7 @@ public class WFCTilemap : MonoBehaviour
 
             // Initialize the map array with the correct size
             tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
+            tilemap.SetLimits(minMapLimit, maxMapLimit);
 
             // Read the tile data
             int tileCount = mapSize.x * mapSize.y * mapSize.z;
@@ -375,6 +377,7 @@ public class WFCTilemap : MonoBehaviour
 
             // Initialize the map array with the correct size
             tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
+            tilemap.SetLimits(minMapLimit, maxMapLimit);
             tilemap.SetUniqueTiles(uniqueTiles);
             tilemap.SetAdjacencyInfo(adjacencyInfo);
         }
@@ -537,12 +540,12 @@ public class WFCTilemap : MonoBehaviour
             Vector3Int p2 = WorldToTilePos(max);
             Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
             Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
-            if (start.x < dynamicLimitStart.x) start.x = dynamicLimitStart.x;
-            if (start.y < dynamicLimitStart.y) start.y = dynamicLimitStart.y;
-            if (start.z < dynamicLimitStart.z) start.z = dynamicLimitStart.z;
-            if (end.x > dynamicLimitEnd.x) end.x = dynamicLimitEnd.x;
-            if (end.y > dynamicLimitEnd.y) end.y = dynamicLimitEnd.y;
-            if (end.z > dynamicLimitEnd.z) end.z = dynamicLimitEnd.z;
+            if (start.x < minMapLimit.x) start.x = minMapLimit.x;
+            if (start.y < minMapLimit.y) start.y = minMapLimit.y;
+            if (start.z < minMapLimit.z) start.z = minMapLimit.z;
+            if (end.x > maxMapLimit.x) end.x = maxMapLimit.x;
+            if (end.y > maxMapLimit.y) end.y = maxMapLimit.y;
+            if (end.z > maxMapLimit.z) end.z = maxMapLimit.z;
 
             int maxTilesPerFrame = 25;
             bool updated = false;
@@ -571,8 +574,8 @@ public class WFCTilemap : MonoBehaviour
         if (hasAnyData)
         {
             // Bounds are not loaded, so we need to compute them
-            localBounds.SetMinMax(new Vector3((-mapSize.x - 1.0f) * gridSize.x * 0.5f, 0.0f, (-mapSize.z - 1.0f) * gridSize.z * 0.5f),
-                                  new Vector3((mapSize.x - 1.0f) * gridSize.x * 0.5f, gridSize.y, (mapSize.z - 1.0f) * gridSize.z * 0.5f));
+            localBounds.SetMinMax(Vector3.zero,
+                                  new Vector3(mapSize.x * gridSize.x, gridSize.y, mapSize.z * gridSize.z));
         }
 
         var prevMatrix = Gizmos.matrix;

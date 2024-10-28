@@ -175,6 +175,8 @@ public class WFCTileData
 
     WFCTileset      tileset;
     Vector3         gridSize;
+    Vector3Int      minMapLimits = new Vector3Int(-int.MaxValue, -int.MaxValue, -int.MaxValue);
+    Vector3Int      maxMapLimits = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
     Vector3Int      clusterSize;
     ProbList<Tile>  uniqueTiles;
     WFCData[]       adjacencyInfo;
@@ -197,6 +199,12 @@ public class WFCTileData
     public void SetAdjacencyInfo(WFCData[] adjacencyInfo)
     {
         this.adjacencyInfo = adjacencyInfo;
+    }
+
+    public void SetLimits(Vector3Int minMapLimits, Vector3Int maxMapLimits)
+    {
+        this.minMapLimits = minMapLimits;
+        this.maxMapLimits = maxMapLimits;
     }
 
     // Create or retrieve the cluster
@@ -306,9 +314,9 @@ public class WFCTileData
     public Vector3 GetLocalPos(int x, int y, int z)
     {
         Vector3 pos = Vector3.zero;
-        pos.x = x * gridSize.x;
+        pos.x = (x + 0.5f) * gridSize.x;
         pos.y = y * gridSize.y;
-        pos.z = z * gridSize.z;
+        pos.z = (z + 0.5f) * gridSize.z;
 
         return pos;
     }
@@ -379,14 +387,14 @@ public class WFCTileData
         cluster.SetProb(localClusterIndex, null);
 
         // Now propagate
-        var ret = Propagate(x, y, z, new ProbList<Tile>(newTile), true);
+        var ret = Propagate(x, y, z, new ProbList<Tile>(newTile), true, 20);
 
         CreateTile(x, y, z);
 
         return ret;
     }
 
-    private GenResult Propagate(int x, int y, int z, ProbList<Tile> tiles, bool force)
+    private GenResult Propagate(int x, int y, int z, ProbList<Tile> tiles, bool force, int depth)
     {
         GenResult PropagateDir(Direction direction, int newX, int newY, int newZ)
         {
@@ -399,10 +407,12 @@ public class WFCTileData
             // Should check if the the cluster for this coordinate exists
             // Don't propagate to clusters that don't exist, if they are generated,
             // then make them work
-            return Propagate(newX, newY, newZ, allowed, false);
+            return Propagate(newX, newY, newZ, allowed, false, depth - 1);
         }
 
         GenResult ret = GenResult.Ok;
+        if (depth == 0) return ret;
+
         bool propagateFurther = false;
 
         (Cluster cluster, Vector3Int localPos) = WorldToClusterPos(x, y, z);
@@ -462,32 +472,32 @@ public class WFCTileData
         if (propagateFurther)
         {
             // Get all tiles allowed to the right (X+), and propagate that
-            if (PropagateDir(Direction.PX, x + 1, y, z) == GenResult.Conflict)
+            if (((x + 1) < maxMapLimits.x) && (PropagateDir(Direction.PX, x + 1, y, z) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Left (X-)
-            if (PropagateDir(Direction.NX, x - 1, y, z) == GenResult.Conflict)
+            if (((x - 1) > minMapLimits.x) && (PropagateDir(Direction.NX, x - 1, y, z) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Forward (Z+)
-            if (PropagateDir(Direction.PZ, x, y, z + 1) == GenResult.Conflict)
+            if (((z + 1) < maxMapLimits.z) && (PropagateDir(Direction.PZ, x, y, z + 1) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Back (Z-)
-            if (PropagateDir(Direction.NZ, x, y, z - 1) == GenResult.Conflict)
+            if (((z - 1) > minMapLimits.z) && (PropagateDir(Direction.NZ, x, y, z - 1) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Up (Y+)
-            if (PropagateDir(Direction.PY, x, y + 1, z) == GenResult.Conflict)
+            if (((y + 1) < maxMapLimits.y) && (PropagateDir(Direction.PY, x, y + 1, z) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Down (Y-)
-            if (PropagateDir(Direction.NY, x, y - 1, z) == GenResult.Conflict)
+            if (((y - 1) > minMapLimits.y) && (PropagateDir(Direction.NY, x, y - 1, z) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
