@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using UnityEngine;
+using static WFCTileData;
 
 [System.Serializable]
 public struct Tile
@@ -40,6 +41,11 @@ public struct Tile
         // Combine the hash codes of the fields
         return tileId.GetHashCode() ^ rotation.GetHashCode();
     }
+
+    public override string ToString()
+    {
+        return $"{{{tileId}, {rotation}}}";
+    }
 }
 
 public enum GenResult { Ok, Conflict, Complete };
@@ -75,7 +81,7 @@ public class WFCData
             {
                 writer.Write(tileProb.element.tileId);     // Write the tileId
                 writer.Write(tileProb.element.rotation);   // Write the rotation
-                writer.Write(tileProb.count);              // Write the count
+                writer.Write(tileProb.weight);              // Write the count
             }
         }
     }
@@ -102,10 +108,10 @@ public class WFCData
                 };
 
                 // Read the count
-                int count = reader.ReadInt32();  // Read the count
+                float weight = reader.ReadSingle();  // Read the count
 
                 // Add the TileProbability to the list for this direction
-                adjacency[dir].Add(tile, count);
+                adjacency[dir].Add(tile, weight);
             }
         }
     }
@@ -118,17 +124,28 @@ public class WFCData
 
 public class WFCTileData
 {
-    class WFCTile
+    public delegate void OnTileSelected(Vector3Int tileSelected);
+    public event OnTileSelected onTileSelected;
+    public delegate void OnCompleted();
+    public event OnCompleted onCompleted;
+    public delegate void OnTileCreate(Vector3Int worldPos, Cluster cluster, Vector3Int clusterPos, Tile tile, ProbList<Tile> possibilities);
+    public event OnTileCreate onTileCreate;
+    public delegate void OnPropagate(Vector3Int prevWorldPos, Vector3Int nextWorldPos, ProbList<Tile> allowedTiles, int depth);
+    public event OnPropagate onPropagate;
+    public delegate void OnConflict(Vector3Int worldPos);
+    public event OnConflict onConflict;
+
+    public class WFCTile
     {
         public Tile             tile;
         public WFCTile3d        tile3d;
         public ProbList<Tile>   probMap;
     }
 
-    class Cluster
+    public class Cluster
     {
-        private Vector3Int  basePos;
-        private WFCTile[]   map;
+        public  Vector3Int  basePos;
+        public  WFCTile[]   map;
         public  Transform   container;
 
         public Cluster(Vector3Int basePos, ProbList<Tile> uniqueTiles, Vector3Int clusterSize, Transform container)
@@ -146,12 +163,16 @@ public class WFCTileData
                 };
             }
 
-            var go = new GameObject();
-            go.name = $"Cluster {basePos.x},{basePos.y},{basePos.z}";
-            go.transform.parent = container;
-            go.AddComponent<WFCCluster>();
+            if (container != null)
+            {
+                var go = new GameObject();
+                go.name = $"Cluster {basePos.x},{basePos.y},{basePos.z}";
+                go.transform.parent = container;
+                go.transform.localPosition = Vector3.zero;
+                go.AddComponent<WFCCluster>();
 
-            this.container = go.transform;
+                this.container = go.transform;
+            }
         }
 
         public Tile GetTile(int index) => map[index].tile;
@@ -173,16 +194,17 @@ public class WFCTileData
 
     Dictionary<Vector3Int, Cluster> clusters = new Dictionary<Vector3Int, Cluster>();
 
-    WFCTileset      tileset;
-    Vector3         gridSize;
-    Vector3Int      minMapLimits = new Vector3Int(-int.MaxValue, -int.MaxValue, -int.MaxValue);
-    Vector3Int      maxMapLimits = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
-    Vector3Int      clusterSize;
-    int             maxDepth = 25;
-    ProbList<Tile>  uniqueTiles;
-    WFCData[]       adjacencyInfo;
-    List<WFCTile3d> conflictTiles;
-    Transform       container;
+    WFCTileset          tileset;
+    Vector3             gridSize;
+    Vector3Int          minMapLimits = new Vector3Int(-int.MaxValue, -int.MaxValue, -int.MaxValue);
+    Vector3Int          maxMapLimits = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
+    public Vector3Int   clusterSize { get; private set; }
+    int                 maxDepth = 25;
+    bool                clusterObjectEnable = true;
+    ProbList<Tile>      uniqueTiles;
+    WFCData[]           adjacencyInfo;
+    List<WFCTile3d>     conflictTiles;
+    Transform           container;    
 
     public WFCTileData(Vector3Int initialSize, Vector3 gridSize, WFCTileset tileset, List<WFCTile3d> conflictTiles, Transform container)
     {
@@ -213,12 +235,17 @@ public class WFCTileData
         this.maxDepth = maxDepth;
     }
 
+    public void DisableClusterObject()
+    {
+        clusterObjectEnable = false;
+    }
+
     // Create or retrieve the cluster
     private Cluster GetOrCreateCluster(Vector3Int clusterPos)
     {
         if (!clusters.ContainsKey(clusterPos))
         {
-            clusters[clusterPos] = new Cluster(clusterPos, uniqueTiles, clusterSize, container);            
+            clusters[clusterPos] = new Cluster(clusterPos, uniqueTiles, clusterSize, (clusterObjectEnable) ? (container) : (null));
         }
 
         return clusters[clusterPos];
@@ -302,8 +329,10 @@ public class WFCTileData
             return;
         }
 
-        var o = GameObject.Instantiate(tileset.GetTile(tile.tileId), cluster.container);
-        o.transform.position = GetWorldPos(x, y, z, cluster.container.localToWorldMatrix);
+        var parent = cluster.container;
+        if (parent == null) parent = container;
+        var o = GameObject.Instantiate(tileset.GetTile(tile.tileId), parent);
+        o.transform.position = GetWorldPos(x, y, z, parent.localToWorldMatrix);
         o.transform.localRotation = Quaternion.Euler(0, 90 * tile.rotation, 0);
 
         cluster.SetTile3d(localClusterIndex, o);
@@ -360,10 +389,12 @@ public class WFCTileData
         Vector3Int? mapCoord = getLowestEntropyIndexFunction();
         if (mapCoord.HasValue)
         {
+            onTileSelected?.Invoke(mapCoord.Value);
             ret = GenerateTile(mapCoord.Value);
         }
         else
         {
+            onCompleted?.Invoke();
             ret = GenResult.Complete;
         }
 
@@ -386,6 +417,8 @@ public class WFCTileData
         Tile newTile = t.probMap.Get();
         if (newTile == null) return GenResult.Ok;
 
+        onTileCreate?.Invoke(new Vector3Int(x, y, z), cluster, localPos, newTile, t.probMap);
+
         // Observe this map position
         cluster.SetTile(localClusterIndex, newTile);
 
@@ -402,8 +435,12 @@ public class WFCTileData
 
     private GenResult Propagate(int x, int y, int z, ProbList<Tile> tiles, bool force, int depth)
     {
-        GenResult PropagateDir(Direction direction, int newX, int newY, int newZ)
+        GenResult PropagateDir(Direction direction, int x, int y, int z, int dx, int dy, int dz)
         {
+            int newX = x + dx;
+            int newY = y + dy;
+            int newZ = z + dz;
+
             ProbList<Tile> allowed = new();
             foreach (var tile in tiles)
             {
@@ -413,6 +450,8 @@ public class WFCTileData
             // Should check if the the cluster for this coordinate exists
             // Don't propagate to clusters that don't exist, if they are generated,
             // then make them work
+            onPropagate?.Invoke(new Vector3Int(x, y, z), new Vector3Int(newX, newY, newZ), allowed, depth - 1);
+
             return Propagate(newX, newY, newZ, allowed, false, depth - 1);
         }
 
@@ -442,7 +481,7 @@ public class WFCTileData
                 }
                 else
                 {
-                    pm.Set(tc.element, Mathf.Min(tc.count, pm.GetCount(tc.element)));
+                    pm.Set(tc.element, Mathf.Min(tc.weight, pm.GetWeight(tc.element)));
                 }
             }
 
@@ -456,6 +495,8 @@ public class WFCTileData
                 // this isn't collapsed, but there's no options, log conflict (for now)
                 Debug.LogWarning("Conflict found in propagation!");
                 t.probMap = null;
+
+                onConflict?.Invoke(new Vector3Int(x, y, z));
 
                 if ((conflictTiles != null) && (conflictTiles.Count > 0))
                 {
@@ -478,32 +519,32 @@ public class WFCTileData
         if (propagateFurther)
         {
             // Get all tiles allowed to the right (X+), and propagate that
-            if (((x + 1) < maxMapLimits.x) && (PropagateDir(Direction.PX, x + 1, y, z) == GenResult.Conflict))
+            if (((x + 1) < maxMapLimits.x) && (PropagateDir(Direction.PX, x, y, z, 1, 0, 0) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Left (X-)
-            if (((x - 1) > minMapLimits.x) && (PropagateDir(Direction.NX, x - 1, y, z) == GenResult.Conflict))
+            if (((x - 1) > minMapLimits.x) && (PropagateDir(Direction.NX, x, y, z, -1, 0, 0) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Forward (Z+)
-            if (((z + 1) < maxMapLimits.z) && (PropagateDir(Direction.PZ, x, y, z + 1) == GenResult.Conflict))
+            if (((z + 1) < maxMapLimits.z) && (PropagateDir(Direction.PZ, x, y, z, 0, 0, 1) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Back (Z-)
-            if (((z - 1) > minMapLimits.z) && (PropagateDir(Direction.NZ, x, y, z - 1) == GenResult.Conflict))
+            if (((z - 1) > minMapLimits.z) && (PropagateDir(Direction.NZ, x, y, z, 0, 0, -1) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Up (Y+)
-            if (((y + 1) < maxMapLimits.y) && (PropagateDir(Direction.PY, x, y + 1, z) == GenResult.Conflict))
+            if (((y + 1) < maxMapLimits.y) && (PropagateDir(Direction.PY, x, y, z, 0, 1, 0) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
             // Down (Y-)
-            if (((y - 1) > minMapLimits.y) && (PropagateDir(Direction.NY, x, y - 1, z) == GenResult.Conflict))
+            if (((y - 1) > minMapLimits.y) && (PropagateDir(Direction.NY, x, y, z, 0, -1, 0) == GenResult.Conflict))
             {
                 ret = GenResult.Conflict;
             }
@@ -714,6 +755,11 @@ public class WFCTileData
         return GetTile(tilePos.x, tilePos.y, tilePos.z);
     }
 
+    internal WFCTile GetWFCTile(Vector3Int tilePos)
+    {
+        return GetWFCTile(tilePos.x, tilePos.y, tilePos.z);
+    }
+
     internal Tile GetTile(int x, int y, int z)
     {
         (Cluster cluster, Vector3Int localPos) = WorldToClusterPos(x, y, z);
@@ -721,5 +767,20 @@ public class WFCTileData
         int localClusterIndex = TilePosToClusterIndex(localPos);
 
         return cluster.GetTile(localClusterIndex);
+    }
+    internal WFCTile GetWFCTile(int x, int y, int z)
+    {
+        (Cluster cluster, Vector3Int localPos) = WorldToClusterPos(x, y, z);
+
+        int localClusterIndex = TilePosToClusterIndex(localPos);
+
+        return cluster.GetWFCTile(localClusterIndex);
+    }
+
+    internal List<Cluster> currentClusters => new List<Cluster>(clusters.Values);
+
+    public Vector3 GetClusterWorldSize()
+    {
+        return new Vector3(clusterSize.x * gridSize.x, clusterSize.y * gridSize.y, clusterSize.x * gridSize.z);
     }
 }

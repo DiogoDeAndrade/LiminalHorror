@@ -7,7 +7,12 @@ using UnityEditor;
 using System.IO;
 using Unity.AI.Navigation;
 using NaughtyAttributes;
+using System;
+using UnityEditor.TerrainTools;
+using UnityEditor.Rendering;
+using System.Security.Cryptography;
 
+[ExecuteInEditMode]
 public class WFCTilemap : MonoBehaviour
 {
     [SerializeField] 
@@ -44,21 +49,31 @@ public class WFCTilemap : MonoBehaviour
 
     [SerializeField]
     private bool            drawGrid = false;
-    [SerializeField]
+    [SerializeField, ShowIf("hasAdjacencyData")]
+    private bool            debugWFC = false;
+    [SerializeField, ShowIf("hasDebugOptions")]
     private bool            drawDebugWFC = false;
+    [SerializeField, ShowIf("hasDebugOptions")]
+    private bool            cellInfo = false;
+    [SerializeField, ShowIf("hasDebugOptions"), ReadOnly, ResizableTextArea]
+    private string          debugInfo = "";
 
     bool hasData => tilemapData != null;
     bool hasAdjacencyData => adjacencyData != null;
     bool hasAnyData => hasData || hasAdjacencyData;
+    bool hasDebugOptions => hasAdjacencyData && debugWFC;
 
     private WFCTileData     tilemap;
 
     private void Awake()
     {
+        if (!Application.isPlaying) return;
     }
 
     private IEnumerator Start()
     {
+        if (!Application.isPlaying) yield break;
+
         if (initOnStart)
         {
             StartTilemap();
@@ -102,7 +117,7 @@ public class WFCTilemap : MonoBehaviour
 
 #if UNITY_EDITOR
     void BuildTilemap()
-    {
+    {        
         var tiles = GetComponentsInChildren<WFCTile3d>();
 
         if (tileset == null)
@@ -137,6 +152,7 @@ public class WFCTilemap : MonoBehaviour
         tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
         tilemap.SetLimits(minMapLimit, maxMapLimit);
         tilemap.SetMaxDepth(maxDepth);
+        tilemap.DisableClusterObject();
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -150,6 +166,7 @@ public class WFCTilemap : MonoBehaviour
                 tilemap.Set(tilePos, t);
             }
         }
+
     }
 #endif
 
@@ -309,26 +326,78 @@ public class WFCTilemap : MonoBehaviour
     void SetupTilemap()
     {
         ClearTilemap();
+        UpdateNavMesh();
         if (!LoadWFCData()) return;
+
+        startedWFC = true;
     }
 
+    bool startedWFC = false;
 
     [Button("Generate Full Map"), ShowIf("hasAdjacencyData")]
     void GenerateFullMap()
     {
         SetupTilemap();
 
-        // Select a tile, using a entropy measure
         switch (GenerateTilemap(Vector3Int.zero, mapSize))
         {
             case GenResult.Ok:
                 break;
             case GenResult.Conflict:
-                Debug.LogWarning("Conflict detected, halting!");
+                Debug.LogWarning("Conflict detected, halted!");
                 break;
             case GenResult.Complete:
                 break;
         }
+    }
+
+    [Button("Generate Step"), ShowIf(EConditionOperator.And, "hasAdjacencyData", "startedWFC")]
+    void GenerateStep()
+    {
+        tilemap.onTileCreate -= Debug_OnTileCreated;
+        tilemap.onConflict -= Debug_OnConflict;
+        tilemap.onPropagate -= Debug_OnPropagate;
+        if (debugWFC)
+        {
+            tilemap.onTileCreate += Debug_OnTileCreated;
+            tilemap.onConflict += Debug_OnConflict;
+            tilemap.onPropagate += Debug_OnPropagate;
+
+            debugPropagations = new();
+        }
+
+        var err = tilemap.GenerateTile(Vector3Int.zero, mapSize);
+        switch (err)
+        {
+            case GenResult.Ok:
+                break;
+            case GenResult.Conflict:
+                Debug.LogWarning("Conflict detected, halted!");
+                startedWFC = false;
+                break;
+            case GenResult.Complete:
+                Debug.LogWarning("Generation completed, halted!");
+                startedWFC = false;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void Debug_OnPropagate(Vector3Int prevPos, Vector3Int nextPos, ProbList<Tile> allowedTiles, int depth)
+    {
+        Debug.Log($"[WFC]: Propagating {allowedTiles.ToSimpleString()} from {prevPos} to ({nextPos}) - Depth = {depth}");
+        debugPropagations.Add((prevPos, nextPos));
+    }
+
+    private void Debug_OnConflict(Vector3Int worldPos)
+    {
+        Debug.Log($"[WFC]: Conflict at ({worldPos})");
+    }
+
+    private void Debug_OnTileCreated(Vector3Int worldPos, WFCTileData.Cluster cluster, Vector3Int clusterPos, Tile tile, ProbList<Tile> possibilities)
+    {
+        Debug.Log($"[WFC]: Create tile at ({worldPos}), cluster = {cluster.basePos}, localPos = {clusterPos}, Tile = {tile}, CurrentSet = {possibilities.ToSimpleString()}");
     }
 
     bool LoadWFCData()
@@ -366,7 +435,7 @@ public class WFCTilemap : MonoBehaviour
                 Tile tile = new Tile();
                 tile.tileId = reader.ReadByte();
                 tile.rotation = reader.ReadByte();
-                int count = reader.ReadInt32();
+                float count = reader.ReadSingle();
                 uniqueTiles.Add(tile, count);
             }
 
@@ -489,7 +558,7 @@ public class WFCTilemap : MonoBehaviour
             {
                 writer.Write(ut.element.tileId);
                 writer.Write(ut.element.rotation);
-                writer.Write(ut.count);
+                writer.Write(ut.weight);
             }
 
             // Write the number of tiles (adjacency.Length)
@@ -523,6 +592,8 @@ public class WFCTilemap : MonoBehaviour
     [Button("Run update")]
     private void Update()
     {
+        if (!Application.isPlaying) return;
+
         if ((isDynamic) && (dynamicCamera))
         {
             Vector3[] corners = new Vector3[4];
@@ -552,7 +623,7 @@ public class WFCTilemap : MonoBehaviour
             if (end.y > maxMapLimit.y) end.y = maxMapLimit.y;
             if (end.z > maxMapLimit.z) end.z = maxMapLimit.z;
 
-            int maxTilesPerFrame = 25;
+            int maxTilesPerFrame = 15;
             bool updated = false;
             for (int i = 0; i < maxTilesPerFrame; i++)
             {
@@ -572,6 +643,21 @@ public class WFCTilemap : MonoBehaviour
                 UpdateNavMesh();
             }
         }
+    }
+
+    static Vector3Int? debugHoveredTile = null;
+    static List<(Vector3Int p1, Vector3Int p2)> debugPropagations = new();
+
+    private void OnEnable()
+    {
+        // Subscribe to the Scene view event
+        SceneView.duringSceneGui += OnSceneGUI;
+    }
+
+    private void OnDisable()
+    {
+        // Unsubscribe when disabled
+        SceneView.duringSceneGui -= OnSceneGUI;
     }
 
     private void OnDrawGizmos()
@@ -636,8 +722,123 @@ public class WFCTilemap : MonoBehaviour
                 }
             }
         }
+        if ((cellInfo) && (debugHoveredTile.HasValue))
+        {
+            Vector3 gSize = gridSize; gSize.y *= 0.05f;
+            Vector3 worldPos = new Vector3((debugHoveredTile.Value.x + 0.5f) * gSize.x, (debugHoveredTile.Value.y + 0.5f) * gSize.y * 0.5f, (debugHoveredTile.Value.z + 0.5f) * gSize.z);
+
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireCube(worldPos, gSize);
+
+            foreach (var p in debugPropagations)
+            {
+                if (p.p1 == debugHoveredTile)
+                {
+                    Vector3 p1 = new Vector3((p.p1.x + 0.5f) * gridSize.x, p.p1.y * gridSize.y, (p.p1.z + 0.5f) * gridSize.z);
+                    Vector3 p2 = new Vector3((p.p2.x + 0.5f) * gridSize.x, p.p2.y * gridSize.y, (p.p2.z + 0.5f) * gridSize.z);
+
+                    Vector3 delta = p2 - p1;
+                    float headSize = delta.magnitude * 0.15f;
+                    Vector3 rightHeadDir = Quaternion.LookRotation(delta) * Quaternion.Euler(0, 150, 0) * Vector3.forward;
+                    Vector3 leftHeadDir = Quaternion.LookRotation(delta) * Quaternion.Euler(0, -150, 0) * Vector3.forward;
+
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawLine(p1, p2);
+                    Gizmos.DrawLine(p2, p2 + rightHeadDir * headSize);
+                    Gizmos.DrawLine(p2, p2 + leftHeadDir * headSize);
+                }
+            }
+        }
 
         Gizmos.matrix = prevMatrix;
+    }
+
+    void OnSceneGUI(SceneView view)
+    { 
+        if ((cellInfo) && (tilemap != null))
+        {
+            // Get mouse position in Scene view
+            Event e = Event.current;
+            if (e != null)
+            {
+                // Only proceed if the mouse is moving in the scene view
+                if (e.type == EventType.MouseMove || e.type == EventType.Repaint)
+                {
+                    debugHoveredTile = null;
+                    debugInfo = "";
+
+                    Vector3 clusterSize = tilemap.GetClusterWorldSize();
+                    Vector3Int clusterSizeInTiles = tilemap.clusterSize;
+                    Vector3 gSize = gridSize; gSize.y *= 0.05f;
+
+                    var clusters = tilemap.currentClusters;
+
+                    foreach (var cluster in clusters)
+                    {
+                        var tiles = cluster.map;
+                        for (int i = 0; i < tiles.Length; i++)
+                        {
+                            // Compute position of this tile
+                            int localX = i % clusterSizeInTiles.x;
+                            int localY = (i / clusterSizeInTiles.x) % clusterSizeInTiles.y;
+                            int localZ = i / (clusterSizeInTiles.x * clusterSizeInTiles.y);
+                            Vector3Int tileWorldPos = new Vector3Int(localX + cluster.basePos.x * clusterSizeInTiles.x,
+                                                                     localY + cluster.basePos.y * clusterSizeInTiles.y,
+                                                                     localZ + cluster.basePos.z * clusterSizeInTiles.z);
+                            Vector3 worldPos = new Vector3((tileWorldPos.x + 0.5f) * gSize.x, (tileWorldPos.y + 0.5f) * gSize.y, (tileWorldPos.z + 0.5f) * gSize.z);
+
+                            Bounds boundingBox = new Bounds(worldPos, gSize);
+
+                            // Create a ray from the mouse position, and change it to local coordinates
+                            Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+                            ray.origin = transform.worldToLocalMatrix.MultiplyPoint(ray.origin);
+                            ray.direction = transform.worldToLocalMatrix.MultiplyVector(ray.direction);
+
+                            // Check if the ray intersects the bounding box
+                            if (boundingBox.IntersectRay(ray))
+                            {
+                                debugHoveredTile = tileWorldPos;
+
+                                var tileInfo = tilemap.GetWFCTile(tileWorldPos);
+
+                                debugInfo = $"Tile Pos = {tileWorldPos}\n";
+                                debugInfo += $"Tile = {tileInfo.tile}\n";
+                                if (tileInfo.probMap == null)
+                                {
+                                    if (tileInfo.tile.tileId == 0) debugInfo += $"No solution possible (conflict will happen)\n";
+                                    else debugInfo += $"Already observed\n";
+                                }
+                                else
+                                {
+                                    debugInfo += $"Allowed states:\n";
+                                    float totalWeight = 0.0f;
+                                    foreach (var prob in tileInfo.probMap)
+                                    {
+                                        totalWeight += prob.weight;
+                                    }
+                                    foreach (var prob in tileInfo.probMap)
+                                    {
+                                        debugInfo += $"  {prob.element} => {prob.weight * 100.0f / totalWeight}%\n";
+                                    }
+                                }
+
+                                debugInfo += "Propagations:\n";
+                                foreach (var p in debugPropagations)
+                                {
+                                    if (p.p1 == tileWorldPos)
+                                    {
+                                        debugInfo += $"  => {p.p2}\n";
+                                    }
+                                }
+
+                                // Repaint the scene view to update the label
+                                view.Repaint();
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void DrawXZGrid(float y)

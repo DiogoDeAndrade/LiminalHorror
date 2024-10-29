@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 45059e131381dee47bcf2472e93806c7, type: 3}
+  m_Name: Checkerboard
+  m_EditorClassIdentifier: 
+  tilePrefabs:
+  - {fileID: 0}
+  - {fileID: 4166138212539166373, guid: 7e0fcba65d9413942b338e4878d58fcd, type: 3}
+  - {fileID: 7269214443654096365, guid: 2456ed55e50173543bd1c1418cf518cd, type: 3}
