@@ -28,6 +28,8 @@ public class WFCTilemap : MonoBehaviour
     private List<WFCTile3d> conflictTiles;
 
     [SerializeField, ShowIf("hasAdjacencyData")]
+    private int             maxDepth = 25;
+    [SerializeField, ShowIf("hasAdjacencyData")]
     private bool            dynamicUpdate;
     [SerializeField, ShowIf("isDynamic")]
     private Camera          dynamicCamera;
@@ -134,6 +136,7 @@ public class WFCTilemap : MonoBehaviour
 
         tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
         tilemap.SetLimits(minMapLimit, maxMapLimit);
+        tilemap.SetMaxDepth(maxDepth);
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -288,6 +291,7 @@ public class WFCTilemap : MonoBehaviour
             // Initialize the map array with the correct size
             tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
             tilemap.SetLimits(minMapLimit, maxMapLimit);
+            tilemap.SetMaxDepth(maxDepth);
 
             // Read the tile data
             int tileCount = mapSize.x * mapSize.y * mapSize.z;
@@ -380,6 +384,7 @@ public class WFCTilemap : MonoBehaviour
             tilemap.SetLimits(minMapLimit, maxMapLimit);
             tilemap.SetUniqueTiles(uniqueTiles);
             tilemap.SetAdjacencyInfo(adjacencyInfo);
+            tilemap.SetMaxDepth(maxDepth);
         }
 
         Debug.Log("Adjacency data loaded successfully!");

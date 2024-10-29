@@ -178,6 +178,7 @@ public class WFCTileData
     Vector3Int      minMapLimits = new Vector3Int(-int.MaxValue, -int.MaxValue, -int.MaxValue);
     Vector3Int      maxMapLimits = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
     Vector3Int      clusterSize;
+    int             maxDepth = 25;
     ProbList<Tile>  uniqueTiles;
     WFCData[]       adjacencyInfo;
     List<WFCTile3d> conflictTiles;
@@ -205,6 +206,11 @@ public class WFCTileData
     {
         this.minMapLimits = minMapLimits;
         this.maxMapLimits = maxMapLimits;
+    }
+
+    public void SetMaxDepth(int maxDepth)
+    {
+        this.maxDepth = maxDepth;
     }
 
     // Create or retrieve the cluster
@@ -387,7 +393,7 @@ public class WFCTileData
         cluster.SetProb(localClusterIndex, null);
 
         // Now propagate
-        var ret = Propagate(x, y, z, new ProbList<Tile>(newTile), true, 20);
+        var ret = Propagate(x, y, z, new ProbList<Tile>(newTile), true, maxDepth);
 
         CreateTile(x, y, z);
 
