@@ -14,6 +14,8 @@ This month, the theme is "Backrooms".
 ## Sound
 
 - Light Bulb Buzzing  by IESP -- https://freesound.org/s/340022/ -- License: [CC-BY 3.0]
+- Breaker-1.wav by Deathscyp -- https://freesound.org/s/404049/ -- License: [CC0]
+- helmutscream_short.wav by creativeheroes -- https://freesound.org/s/84353/ -- [CC-BY-SA 4.0]
 - Everything else done by [Diogo de Andrade], licensed through the [CC0] license.
 
 ## Code

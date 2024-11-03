@@ -219,6 +219,13 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.videojogoslusofona.okapikit": {
+      "version": "https://github.com/VideojogosLusofona/OkapiKit.git#upm",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "fb5991577ba740ebde787cbc74d22c61af6ef2e3"
+    },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
       "depth": 0,
