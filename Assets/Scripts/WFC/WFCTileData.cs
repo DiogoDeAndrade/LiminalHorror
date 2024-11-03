@@ -3,7 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Tilemaps;
+using UnityEngine.WSA;
+using UnityMeshSimplifier.Internal;
+using static UnityEditor.PlayerSettings;
 using static WFCTileData;
+using static WFCTileData.Cluster;
 
 [System.Serializable]
 public struct Tile
@@ -142,15 +147,19 @@ public class WFCTileData
         public ProbList<Tile>   probMap;
     }
 
+    static Dictionary<Tile, List<WFCTile3d>> tilePool = new();
+
     public class Cluster
     {
         public  Vector3Int  basePos;
         public  WFCTile[]   map;
         public  Transform   container;
+        public  Vector3Int  clusterSize;
 
         public Cluster(Vector3Int basePos, ProbList<Tile> uniqueTiles, Vector3Int clusterSize, Transform container)
         {
             this.basePos = basePos;
+            this.clusterSize = clusterSize;
 
             map = new WFCTile[clusterSize.x * clusterSize.y * clusterSize.z];
             // Initialize the cluster with default WFCTile values
@@ -179,16 +188,143 @@ public class WFCTileData
         public void SetTile(int index, Tile t) { map[index].tile = t; }
         public void SetProb(int index, ProbList<Tile> probMap) { map[index].probMap = probMap; }
         public WFCTile GetWFCTile(int index) => map[index];
-
-        internal void SetTile3d(int localClusterIndex, WFCTile3d obj)
+        public WFCTile GetWFCTile(int x, int y, int z) => map[TilePosToClusterIndex(x, y, z)];
+        public int TilePosToClusterIndex(int x, int y, int z)
         {
-            var prevObj = map[localClusterIndex].tile3d;
+            return x + y * clusterSize.x + z * (clusterSize.x * clusterSize.y);
+        }
+
+        internal void SetTile3d(int localClusterIndex, WFCTile3d obj, bool usePool, Transform poolContainer)
+        {
+            var tileObj = map[localClusterIndex];
+            var prevObj = tileObj.tile3d;
             if (prevObj)
             {
-                GameObject.Destroy(prevObj.gameObject);
+                if (usePool)
+                {
+                    SendTileToPool(tileObj, poolContainer);
+                }
+                else
+                { 
+                    GameObject.Destroy(prevObj.gameObject);
+                }
             }
             
-            map[localClusterIndex].tile3d = obj;
+            tileObj.tile3d = obj;
+        }
+
+        internal void SendTileToPool(WFCTile tile, Transform poolContainer)
+        {
+            if (tile.tile3d != null)
+            {
+                if (!tilePool.TryGetValue(tile.tile, out var tileList))
+                {
+                    tileList = new();
+                    tilePool.Add(tile.tile, tileList);
+                }
+                tileList.Add(tile.tile3d);
+                tile.tile3d.transform.SetParent(poolContainer);
+                tile.tile3d.gameObject.SetActive(false);
+                tile.tile3d = null;
+            }
+        }
+
+        internal void Clear(bool usePool, Transform poolContainer)
+        {
+            if (usePool)
+            {
+                foreach (var tile in map)
+                {
+                    SendTileToPool(tile, poolContainer);
+                }
+            }
+
+            if (container)
+            {
+                container.gameObject.Delete();
+            }
+        }
+
+        public delegate void SolveConflictFunction(Vector3Int pos);
+        public delegate void PropagateCallbackFunction(Vector3Int prevWorldPos, Vector3Int nextWorldPos, ProbList<Tile> allowedTiles, int depth);
+
+        // This propagates only within the cluster, so x, y and z are in local cluster coordinates
+        internal void Propagate(int x, int y, int z, ProbList<Tile> tiles, int depth, WFCTileData mainData, SolveConflictFunction solveConflictFunction, PropagateCallbackFunction propagateCallbackFunction)
+        {
+            void PropagateDir(Direction direction, int x, int y, int z, int dx, int dy, int dz)
+            {
+                int newX = x + dx;
+                int newY = y + dy;
+                int newZ = z + dz;
+
+                ProbList<Tile> allowed = new();
+                foreach (var tile in tiles)
+                {
+                    int uniqueId = mainData.uniqueTiles.IndexOf(tile.element);
+                    if (uniqueId != -1) allowed.Add(mainData.adjacencyInfo[uniqueId].Get(direction));
+                }
+                // Should check if the the cluster for this coordinate exists
+                // Don't propagate to clusters that don't exist, if they are generated,
+                // then make them work
+                propagateCallbackFunction(new Vector3Int(x, y, z), new Vector3Int(newX, newY, newZ), allowed, depth - 1);
+
+                Propagate(newX, newY, newZ, allowed, depth - 1, mainData, solveConflictFunction, propagateCallbackFunction);
+            }
+
+            if (depth == 0) return;
+
+            bool propagateFurther = false;
+
+            var t = GetWFCTile(x, y, z);
+
+            var pm = t.probMap;
+            if (pm != null)
+            {                
+                // Check if something should be removed
+                foreach (var tc in pm)
+                {                    
+                    if (tiles.IndexOf(tc.element) == -1)
+                    {
+                        // This should be removed
+                        pm.Set(tc.element, 0);
+                        // We changed the list, need to propagate the change
+                        propagateFurther = true;
+                    }
+                    else
+                    {
+                        pm.Set(tc.element, Mathf.Min(tc.weight, pm.GetWeight(tc.element)));
+                    }
+                }
+
+                if (propagateFurther)
+                {
+                    pm.Cleanup();
+                }
+
+                if (pm.Count == 0)
+                {
+                    // this isn't collapsed, but there's no options, log conflict (for now)
+                    t.probMap = null;
+
+                    Vector3Int worldTilePos = new Vector3Int(basePos.x * clusterSize.x + x, basePos.y * clusterSize.y + y, basePos.z * clusterSize.z + z);
+
+                    solveConflictFunction(worldTilePos);
+                }
+            }
+
+            if (propagateFurther)
+            {
+                // Get all tiles allowed to the right (X+), and propagate that
+                if (x < clusterSize.x - 1) PropagateDir(Direction.PX, x, y, z, 1, 0, 0);
+                // Left (X-)
+                if (x > 0) PropagateDir(Direction.NX, x, y, z, -1, 0, 0);
+                // Forward (Z+)
+                if (z < clusterSize.z - 1) PropagateDir(Direction.PZ, x, y, z, 0, 0, 1);
+                // Back (Z-)
+                if (z > 0) PropagateDir(Direction.NZ, x, y, z, 0, 0, -1);
+
+                // Again, no propagation on Y (current support is lacking)
+            }
         }
     }
 
@@ -204,7 +340,9 @@ public class WFCTileData
     ProbList<Tile>      uniqueTiles;
     WFCData[]           adjacencyInfo;
     List<WFCTile3d>     conflictTiles;
-    Transform           container;    
+    Transform           container;  
+    bool                poolEnable;
+    Transform           poolContainer;
 
     public WFCTileData(Vector3Int initialSize, Vector3 gridSize, WFCTileset tileset, List<WFCTile3d> conflictTiles, Transform container)
     {
@@ -240,16 +378,106 @@ public class WFCTileData
         clusterObjectEnable = false;
     }
 
+    public void SetPooling(bool enable, Transform container = null)
+    {
+        this.poolEnable = enable;
+        this.poolContainer = container;
+    }
+
     // Create or retrieve the cluster
     private Cluster GetOrCreateCluster(Vector3Int clusterPos)
     {
         if (!clusters.ContainsKey(clusterPos))
         {
-            clusters[clusterPos] = new Cluster(clusterPos, uniqueTiles, clusterSize, (clusterObjectEnable) ? (container) : (null));
+            var cluster = new Cluster(clusterPos, uniqueTiles, clusterSize, (clusterObjectEnable) ? (container) : (null));
+            clusters[clusterPos] = cluster;
+
+            // Initialize this cluster based on the data around it - THIS DOESN'T WORK FOR 3D, only for 2D (XZ) - Future work maybe
+            // Get corner pos
+            Vector3Int cornerPos = new Vector3Int(clusterPos.x * clusterSize.x, clusterPos.y * clusterSize.y, clusterPos.z * clusterSize.z);
+
+            // Find clusters to the north, south, east, west, up and down, if any
+            var clusterNorth = GetCluster(new Vector3Int(clusterPos.x, clusterPos.y, clusterPos.z + 1));
+            var clusterSouth = GetCluster(new Vector3Int(clusterPos.x, clusterPos.y, clusterPos.z - 1));
+            var clusterEast = GetCluster(new Vector3Int(clusterPos.x + 1, clusterPos.y, clusterPos.z));
+            var clusterWest = GetCluster(new Vector3Int(clusterPos.x - 1, clusterPos.y, clusterPos.z));
+
+            PropagateCallbackFunction propagateCallbackFunction = (Vector3Int prevWorldPos, Vector3Int nextWorldPos, ProbList<Tile> allowedTiles, int depth) =>
+            {
+                onPropagate?.Invoke(prevWorldPos, nextWorldPos, allowedTiles, depth - 1);
+            };
+
+            SolveConflictFunction solveConflictFunction = (Vector3Int worldTilePos) =>
+            {
+                onConflict?.Invoke(worldTilePos);
+
+                if ((conflictTiles != null) && (conflictTiles.Count > 0))
+                {
+                    // Resolve this one - set map to one of the conflict tiles
+                    WFCTile3d tile = conflictTiles.Random();
+                    int localClusterIndex = TilePosToClusterIndex(WorldToClusterPosIndex(worldTilePos));
+                    cluster.SetTile(localClusterIndex, new Tile() { tileId = tileset.GetTileIndex(tile), rotation = (byte)UnityEngine.Random.Range(0, 3) });
+                    CreateTile(worldTilePos.x, worldTilePos.y, worldTilePos.z);
+                }
+            };
+
+            if (clusterNorth != null)
+            {
+                for (int i = 0; i < clusterSize.x; i++)
+                {
+                    var tile = clusterNorth.GetWFCTile(i, 0, 0);
+                    var pm = (tile.probMap != null) ? (tile.probMap) : (new(tile.tile));
+                    cluster.Propagate(i, 0, clusterSize.z - 1, pm, maxDepth, this, solveConflictFunction, propagateCallbackFunction);
+                }
+            }
+            if (clusterSouth != null)
+            {
+                for (int i = 0; i < clusterSize.x; i++)
+                {
+                    var tile = clusterSouth.GetWFCTile(i, 0, clusterSize.z - 1);
+                    var pm = (tile.probMap != null) ? (tile.probMap) : (new(tile.tile));
+                    cluster.Propagate(i, 0, 0, pm, maxDepth, this, solveConflictFunction, propagateCallbackFunction);
+                }
+            }
+            if (clusterEast != null)
+            {
+                for (int i = 0; i < clusterSize.z; i++)
+                {
+                    var tile = clusterEast.GetWFCTile(0, 0, i);
+                    var pm = (tile.probMap != null) ? (tile.probMap) : (new(tile.tile));
+                    cluster.Propagate(clusterSize.x - 1, 0, i, pm, maxDepth, this, solveConflictFunction, propagateCallbackFunction);
+                }
+            }
+            if (clusterWest != null)
+            {
+                for (int i = 0; i < clusterSize.z; i++)
+                {
+                    var tile = clusterWest.GetWFCTile(clusterSize.x - 1, 0, i);
+                    var pm = (tile.probMap != null) ? (tile.probMap) : (new(tile.tile));
+                    cluster.Propagate(0, 0, i, pm, maxDepth, this, solveConflictFunction, propagateCallbackFunction);
+                }
+            }
         }
 
         return clusters[clusterPos];
     }
+
+    private Cluster GetCluster(Vector3Int clusterPos)
+    {
+        if (clusters.TryGetValue(clusterPos, out Cluster cluster))
+        {
+            return cluster;
+        }
+
+        return null;
+    }
+
+    public void RemoveCluster(Cluster cluster)
+    {
+        cluster.Clear(poolEnable, poolContainer);
+        clusters.Remove(cluster.basePos);
+    }
+
 
     // Get the tile from the correct cluster
     private WFCTile GetTileFromCluster(Vector3Int worldPos)
@@ -283,6 +511,15 @@ public class WFCTileData
         return (GetOrCreateCluster(clusterPos), localPos);
     }
 
+    private Vector3Int WorldToClusterPosIndex(Vector3Int worldPos)
+    {
+        return WorldToClusterPosIndex(worldPos.x, worldPos.y, worldPos.z);
+    }
+    private Vector3Int WorldToClusterPosIndex(int x, int y, int z)
+    {
+        return new Vector3Int(Mod(x, clusterSize.x), Mod(y, clusterSize.y), Mod(z, clusterSize.z));
+    }
+
     private int Mod(int a, int b)
     {
         return (a % b + b) % b;
@@ -313,7 +550,7 @@ public class WFCTileData
 
         int index = TilePosToClusterIndex(localPos);
 
-        cluster.SetTile3d(index, null);
+        cluster.SetTile3d(index, null, poolEnable, poolContainer);
     }
 
     internal void CreateTile(int x, int y, int z)
@@ -325,7 +562,7 @@ public class WFCTileData
         var tile = cluster.GetTile(localClusterIndex);
         if (tile.tileId == 0)
         {
-            cluster.SetTile3d(localClusterIndex, null);
+            cluster.SetTile3d(localClusterIndex, null, poolEnable, poolContainer);
             return;
         }
 
@@ -335,7 +572,7 @@ public class WFCTileData
         o.transform.position = GetWorldPos(x, y, z, parent.localToWorldMatrix);
         o.transform.localRotation = Quaternion.Euler(0, 90 * tile.rotation, 0);
 
-        cluster.SetTile3d(localClusterIndex, o);
+        cluster.SetTile3d(localClusterIndex, o, poolEnable, poolContainer);
     }
 
     public Vector3 GetWorldPos(Vector3Int tilePos, Matrix4x4 localToWorldMatrix)
@@ -493,7 +730,6 @@ public class WFCTileData
             if (pm.Count == 0)
             {
                 // this isn't collapsed, but there's no options, log conflict (for now)
-                Debug.LogWarning("Conflict found in propagation!");
                 t.probMap = null;
 
                 onConflict?.Invoke(new Vector3Int(x, y, z));
@@ -507,6 +743,7 @@ public class WFCTileData
                 }
                 else
                 {
+                    Debug.LogWarning("Conflict found in propagation!");
                     ret = GenResult.Conflict;
                 }
             }

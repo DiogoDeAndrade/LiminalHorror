@@ -56,6 +56,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: BackroomWallOpeningDouble
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 29c71e5737179644b82e6c6f21726e45, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

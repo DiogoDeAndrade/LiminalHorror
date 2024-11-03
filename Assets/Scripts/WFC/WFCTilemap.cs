@@ -7,14 +7,14 @@ using UnityEditor;
 using System.IO;
 using Unity.AI.Navigation;
 using NaughtyAttributes;
-using System;
-using UnityEditor.TerrainTools;
-using UnityEditor.Rendering;
-using System.Security.Cryptography;
+using System.Diagnostics;
+using Debug = UnityEngine.Debug;
 
 [ExecuteInEditMode]
 public class WFCTilemap : MonoBehaviour
 {
+    public delegate void MapStartupFunction();
+
     [SerializeField] 
     private bool            initOnStart;
     [SerializeField, HideIf("hasAdjacencyData")]
@@ -39,11 +39,21 @@ public class WFCTilemap : MonoBehaviour
     [SerializeField, ShowIf("isDynamic")]
     private Camera          dynamicCamera;
     [SerializeField, ShowIf("isDynamic")]
-    private float           dynamicRadius;
+    private float           maxGenerationDistance = 50;
+    [SerializeField, ShowIf("isDynamic")]
+    private float           fadeOutDistance = 10;
+    [SerializeField, ShowIf("isDynamic")]
+    private float           maxTimePerFrameMS = 15.0f;
+    [SerializeField, ShowIf("isDynamic")]
+    private bool            buildNavmesh = false;
     [SerializeField, ShowIf("isDynamic")]
     private Vector3Int      minMapLimit = new Vector3Int(-10000, 0, -10000);
     [SerializeField, ShowIf("isDynamic")]
     private Vector3Int      maxMapLimit = new Vector3Int(-10000, 1, -10000);
+    [SerializeField, ShowIf("isDynamic")]
+    private bool            usePooling;
+    [SerializeField, ShowIf("isDynamic")]
+    private Transform       poolingContainer;
 
     bool isDynamic => hasAdjacencyData && dynamicUpdate;
 
@@ -57,6 +67,8 @@ public class WFCTilemap : MonoBehaviour
     private bool            cellInfo = false;
     [SerializeField, ShowIf("hasDebugOptions"), ReadOnly, ResizableTextArea]
     private string          debugInfo = "";
+    [SerializeField, ShowIf("hasDebugOptions"), ReadOnly]
+    private float           debuglastGenerationTimeMS;
 
     bool hasData => tilemapData != null;
     bool hasAdjacencyData => adjacencyData != null;
@@ -78,7 +90,7 @@ public class WFCTilemap : MonoBehaviour
         {
             StartTilemap();
             yield return null;
-            UpdateNavMesh();
+            if (buildNavmesh) UpdateNavMesh();
         }
     }
 
@@ -153,6 +165,7 @@ public class WFCTilemap : MonoBehaviour
         tilemap.SetLimits(minMapLimit, maxMapLimit);
         tilemap.SetMaxDepth(maxDepth);
         tilemap.DisableClusterObject();
+        tilemap.SetPooling(usePooling, poolingContainer);
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -266,7 +279,7 @@ public class WFCTilemap : MonoBehaviour
         }
         else if (adjacencyData != null)
         {
-            GenerateFullMap();
+            GenerateMap();
         }
     }
 
@@ -309,6 +322,7 @@ public class WFCTilemap : MonoBehaviour
             tilemap = new WFCTileData(mapSize, gridSize, tileset, conflictTiles, transform);
             tilemap.SetLimits(minMapLimit, maxMapLimit);
             tilemap.SetMaxDepth(maxDepth);
+            tilemap.SetPooling(usePooling, poolingContainer);
 
             // Read the tile data
             int tileCount = mapSize.x * mapSize.y * mapSize.z;
@@ -326,7 +340,7 @@ public class WFCTilemap : MonoBehaviour
     void SetupTilemap()
     {
         ClearTilemap();
-        UpdateNavMesh();
+        if (buildNavmesh) UpdateNavMesh();
         if (!LoadWFCData()) return;
 
         startedWFC = true;
@@ -335,9 +349,10 @@ public class WFCTilemap : MonoBehaviour
     bool startedWFC = false;
 
     [Button("Generate Full Map"), ShowIf("hasAdjacencyData")]
-    void GenerateFullMap()
+    public void GenerateMap(MapStartupFunction startupFunction = null)
     {
         SetupTilemap();
+        startupFunction?.Invoke();
 
         switch (GenerateTilemap(Vector3Int.zero, mapSize))
         {
@@ -454,6 +469,7 @@ public class WFCTilemap : MonoBehaviour
             tilemap.SetUniqueTiles(uniqueTiles);
             tilemap.SetAdjacencyInfo(adjacencyInfo);
             tilemap.SetMaxDepth(maxDepth);
+            tilemap.SetPooling(usePooling, poolingContainer);
         }
 
         Debug.Log("Adjacency data loaded successfully!");
@@ -596,49 +612,88 @@ public class WFCTilemap : MonoBehaviour
 
         if ((isDynamic) && (dynamicCamera))
         {
-            Vector3[] corners = new Vector3[4];
-            dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), dynamicRadius, Camera.MonoOrStereoscopicEye.Mono, corners);
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
 
-            Vector3 min = dynamicCamera.transform.position;
-            Vector3 max = dynamicCamera.transform.position;
-            for (int i = 0; i < 4; i++)
-            {
-                corners[i] = dynamicCamera.transform.localToWorldMatrix.MultiplyPoint3x4(corners[i]);
-                if (corners[i].x < min.x) min.x = corners[i].x;
-                if (corners[i].y < min.y) min.y = corners[i].y;
-                if (corners[i].z < min.z) min.z = corners[i].z;
-                if (corners[i].x > max.x) max.x = corners[i].x;
-                if (corners[i].y > max.y) max.y = corners[i].y;
-                if (corners[i].z > max.z) max.z = corners[i].z;
-            }
-
-            Vector3Int p1 = WorldToTilePos(min);
-            Vector3Int p2 = WorldToTilePos(max);
-            Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
-            Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
-            if (start.x < minMapLimit.x) start.x = minMapLimit.x;
-            if (start.y < minMapLimit.y) start.y = minMapLimit.y;
-            if (start.z < minMapLimit.z) start.z = minMapLimit.z;
-            if (end.x > maxMapLimit.x) end.x = maxMapLimit.x;
-            if (end.y > maxMapLimit.y) end.y = maxMapLimit.y;
-            if (end.z > maxMapLimit.z) end.z = maxMapLimit.z;
-
-            int maxTilesPerFrame = 15;
             bool updated = false;
-            for (int i = 0; i < maxTilesPerFrame; i++)
+            int currentDistance = Mathf.CeilToInt(Mathf.Min(2, maxGenerationDistance * 0.1f));
+            int incDistance = currentDistance;
+
+            while (currentDistance <= maxGenerationDistance)
             {
-                var err = tilemap.GenerateTile(start, end - start);
-                if ((err == GenResult.Ok) || (err == GenResult.Conflict))
+                Vector3[] corners = new Vector3[4];
+                dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), currentDistance, Camera.MonoOrStereoscopicEye.Mono, corners);
+
+                Vector3 min = dynamicCamera.transform.position;
+                Vector3 max = dynamicCamera.transform.position;
+                for (int i = 0; i < 4; i++)
                 {
-                    updated = true;
+                    corners[i] = dynamicCamera.transform.localToWorldMatrix.MultiplyPoint3x4(corners[i]);
+                    if (corners[i].x < min.x) min.x = corners[i].x;
+                    if (corners[i].y < min.y) min.y = corners[i].y;
+                    if (corners[i].z < min.z) min.z = corners[i].z;
+                    if (corners[i].x > max.x) max.x = corners[i].x;
+                    if (corners[i].y > max.y) max.y = corners[i].y;
+                    if (corners[i].z > max.z) max.z = corners[i].z;
                 }
-                else
+
+                Vector3Int p1 = WorldToTilePos(min);
+                Vector3Int p2 = WorldToTilePos(max);
+                Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
+                Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
+                if (start.x < minMapLimit.x) start.x = minMapLimit.x;
+                if (start.y < minMapLimit.y) start.y = minMapLimit.y;
+                if (start.z < minMapLimit.z) start.z = minMapLimit.z;
+                if (end.x > maxMapLimit.x) end.x = maxMapLimit.x;
+                if (end.y > maxMapLimit.y) end.y = maxMapLimit.y;
+                if (end.z > maxMapLimit.z) end.z = maxMapLimit.z;
+
+                for (int i = 0; i < 5; i++)
                 {
-                    break;
+                    var err = tilemap.GenerateTile(start, end - start);
+                    if ((err == GenResult.Ok) || (err == GenResult.Conflict))
+                    {
+                        updated = true;
+                    }
+                    else
+                    {
+                        currentDistance += incDistance;
+                    }
+
+                    if (sw.ElapsedMilliseconds > maxTimePerFrameMS) break;
+                }
+
+                if (sw.ElapsedMilliseconds > maxTimePerFrameMS) break;
+            }
+
+            sw.Stop();
+            debuglastGenerationTimeMS = sw.ElapsedMilliseconds;
+
+            Vector3 localCameraPos = transform.worldToLocalMatrix.MultiplyPoint(dynamicCamera.transform.position);
+            Vector3 localCameraDir = transform.worldToLocalMatrix.MultiplyVector(dynamicCamera.transform.forward); localCameraDir.y = 0; localCameraDir.Normalize();
+            var activeClusters = new List<WFCTileData.Cluster>(tilemap.currentClusters);
+            foreach (var cluster in tilemap.currentClusters)
+            {
+                // Get cluster world position
+                Vector3 clusterCenter = cluster.basePos;
+                clusterCenter.x = (clusterCenter.x + 0.5f ) * gridSize.x * tilemap.clusterSize.x;
+                clusterCenter.y = (clusterCenter.y + 0.5f ) * gridSize.y * tilemap.clusterSize.y;
+                clusterCenter.z = (clusterCenter.z + 0.5f ) * gridSize.z * tilemap.clusterSize.z;
+
+                Vector3 toClusterCenter = clusterCenter - localCameraPos;
+                float distance = toClusterCenter.magnitude;
+                toClusterCenter /= distance;
+                if (distance > fadeOutDistance)
+                {
+                    if (Vector3.Dot(toClusterCenter, localCameraDir) < -0.25f)
+                    {
+                        // Remove this cluster
+                        tilemap.RemoveCluster(cluster);
+                    }
                 }
             }
 
-            if (updated)
+            if ((updated) && (buildNavmesh))
             {
                 UpdateNavMesh();
             }
@@ -683,10 +738,10 @@ public class WFCTilemap : MonoBehaviour
             {
                 Gizmos.color = Color.green;
                 Gizmos.matrix = dynamicCamera.transform.localToWorldMatrix;
-                Gizmos.DrawFrustum(Vector3.zero, dynamicCamera.fieldOfView, dynamicRadius, 1.0f, 16.0f / 9.0f);
+                Gizmos.DrawFrustum(Vector3.zero, dynamicCamera.fieldOfView, maxGenerationDistance, 1.0f, 16.0f / 9.0f);
 
                 Vector3[] corners = new Vector3[4];
-                dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), dynamicRadius, Camera.MonoOrStereoscopicEye.Mono, corners);
+                dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), maxGenerationDistance, Camera.MonoOrStereoscopicEye.Mono, corners);
 
                 Vector3 min = dynamicCamera.transform.position;
                 Vector3 max = dynamicCamera.transform.position;

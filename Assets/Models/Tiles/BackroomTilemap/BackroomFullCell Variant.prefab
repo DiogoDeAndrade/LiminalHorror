@@ -125,9 +125,21 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 6e86f57bca398fa4eb63937682cd7b04, type: 2}
+    - target: {fileID: -3477864577585124648, guid: ec1834cca76cea944992e8871175ee7a, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: ec1834cca76cea944992e8871175ee7a, type: 3}
       propertyPath: m_Name
       value: BackroomWallFull
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: ec1834cca76cea944992e8871175ee7a, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
+    - target: {fileID: 1396792749669637682, guid: ec1834cca76cea944992e8871175ee7a, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
       objectReference: {fileID: 0}
     - target: {fileID: 8280704227580990285, guid: ec1834cca76cea944992e8871175ee7a, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
