@@ -1,14 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using UnityEngine;
-using UnityEngine.Tilemaps;
-using UnityEngine.WSA;
-using UnityMeshSimplifier.Internal;
-using static UnityEditor.PlayerSettings;
-using static WFCTileData;
-using static WFCTileData.Cluster;
 
 [System.Serializable]
 public struct Tile
@@ -69,6 +62,11 @@ public class WFCData
     public void Add(Direction direction, Tile tile)
     {
         adjacency[(int)direction].Add(tile, 1);
+    }
+
+    public void Set(Direction direction, ProbList<Tile> tiles)
+    {
+        adjacency[(int)direction] = new(tiles);
     }
 
     internal void Save(BinaryWriter writer)
@@ -148,6 +146,9 @@ public class WFCTileData
     }
 
     static Dictionary<Tile, List<WFCTile3d>> tilePool = new();
+
+    public delegate void SolveConflictFunction(Vector3Int pos);
+    public delegate void PropagateCallbackFunction(Vector3Int prevWorldPos, Vector3Int nextWorldPos, ProbList<Tile> allowedTiles, int depth);
 
     public class Cluster
     {
@@ -245,9 +246,6 @@ public class WFCTileData
             }
         }
 
-        public delegate void SolveConflictFunction(Vector3Int pos);
-        public delegate void PropagateCallbackFunction(Vector3Int prevWorldPos, Vector3Int nextWorldPos, ProbList<Tile> allowedTiles, int depth);
-
         // This propagates only within the cluster, so x, y and z are in local cluster coordinates
         internal void Propagate(int x, int y, int z, ProbList<Tile> tiles, int depth, WFCTileData mainData, SolveConflictFunction solveConflictFunction, PropagateCallbackFunction propagateCallbackFunction)
         {
@@ -338,7 +336,7 @@ public class WFCTileData
     int                 maxDepth = 25;
     bool                clusterObjectEnable = true;
     ProbList<Tile>      uniqueTiles;
-    WFCData[]           adjacencyInfo;
+    List<WFCData>       adjacencyInfo;
     List<WFCTile3d>     conflictTiles;
     Transform           container;  
     bool                poolEnable;
@@ -357,7 +355,7 @@ public class WFCTileData
     {
         this.uniqueTiles = uniqueTiles;
     }
-    public void SetAdjacencyInfo(WFCData[] adjacencyInfo)
+    public void SetAdjacencyInfo(List<WFCData> adjacencyInfo)
     {
         this.adjacencyInfo = adjacencyInfo;
     }

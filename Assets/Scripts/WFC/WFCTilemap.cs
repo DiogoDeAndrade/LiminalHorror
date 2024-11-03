@@ -457,11 +457,42 @@ public class WFCTilemap : MonoBehaviour
 
             // Read adjacency array
             int adjacencyLength = reader.ReadInt32();
-            var adjacencyInfo = new WFCData[adjacencyLength];
+            var adjacencyInfo = new List<WFCData>(); for (int i = 0; i <adjacencyLength; i++) adjacencyInfo.Add(null);
             for (int i = 0; i < adjacencyLength; i++)
             {
                 adjacencyInfo[i] = new WFCData();
                 adjacencyInfo[i].Load(reader);
+            }
+
+            // Add conflict tiles to tileset and unique tiles
+            List<int> conflictTilesIds = new();
+            foreach (var tile in conflictTiles)
+            {
+                var tileId = tileset.GetTileIndex(tile);
+                if (tileId == 255) tileset.Add(tile);
+
+                // Add to unique tiles
+                for (byte i = 0; i < 4; i++)
+                {
+                    Tile t = new Tile { tileId = tileId, rotation = i };
+                    if (uniqueTiles.IndexOf(t) == -1)
+                    {
+                        uniqueTiles.Add(t, 0.001f);
+                    }
+                    conflictTilesIds.Add(uniqueTiles.IndexOf(t));
+                }
+            }
+            // Create adjacency lists for the conflict tiles
+            for (int i = adjacencyInfo.Count; i < uniqueTiles.Count; i++) adjacencyInfo.Add(null);
+            foreach (var uniqueId in conflictTilesIds)
+            {
+                adjacencyInfo[uniqueId] = new WFCData();
+                adjacencyInfo[uniqueId].Set(Direction.PX, uniqueTiles);
+                adjacencyInfo[uniqueId].Set(Direction.NX, uniqueTiles);
+                adjacencyInfo[uniqueId].Set(Direction.PY, uniqueTiles);
+                adjacencyInfo[uniqueId].Set(Direction.NY, uniqueTiles);
+                adjacencyInfo[uniqueId].Set(Direction.PZ, uniqueTiles);
+                adjacencyInfo[uniqueId].Set(Direction.NZ, uniqueTiles);
             }
 
             // Initialize the map array with the correct size
@@ -536,8 +567,8 @@ public class WFCTilemap : MonoBehaviour
         }
 
         // Build adjacency information
-        var adjacencyInfo = new WFCData[uniqueTiles.Count];
-        for (int i = 0; i < adjacencyInfo.Length; i++) adjacencyInfo[i] = new WFCData();
+        var adjacencyInfo = new List<WFCData>(); for (int i = 0; i < uniqueTiles.Count; i++) adjacencyInfo.Add(null);
+        for (int i = 0; i < adjacencyInfo.Count; i++) adjacencyInfo[i] = new WFCData();
 
         for (int z = 0; z < mapSize.z; z++)
         {
@@ -579,10 +610,10 @@ public class WFCTilemap : MonoBehaviour
             }
 
             // Write the number of tiles (adjacency.Length)
-            writer.Write(adjacencyInfo.Length);
+            writer.Write(adjacencyInfo.Count);
 
             // For each tile in the adjacency array
-            for (int i = 0; i < adjacencyInfo.Length; i++)
+            for (int i = 0; i < adjacencyInfo.Count; i++)
             {
                 adjacencyInfo[i].Save(writer);
             }

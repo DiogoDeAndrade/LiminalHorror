@@ -33,6 +33,7 @@ public class WFCTileset : ScriptableObject
         if (!tilePrefabIndex.TryGetValue(tile, out byte tileId))
         {
             Debug.LogWarning($"Tileset {name} doesn't include {tile.name}!");
+            return 255;
         }
         return tileId;
     }
