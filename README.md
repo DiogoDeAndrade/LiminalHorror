@@ -13,6 +13,7 @@ This month, the theme is "Backrooms".
 
 ## Sound
 
+- Light Bulb Buzzing  by IESP -- https://freesound.org/s/340022/ -- License: [CC-BY 3.0]
 - Everything else done by [Diogo de Andrade], licensed through the [CC0] license.
 
 ## Code
