@@ -1020,4 +1020,29 @@ public class WFCTileData
     {
         return new Vector3(clusterSize.x * gridSize.x, clusterSize.y * gridSize.y, clusterSize.x * gridSize.z);
     }
+
+    internal GenResult Observe(Vector3Int worldTilePos, byte tileId, byte rotation)
+    {
+        (Cluster cluster, Vector3Int localPos) = WorldToClusterPos(worldTilePos);
+
+        int localClusterIndex = TilePosToClusterIndex(localPos);
+
+        var t = cluster.GetWFCTile(localClusterIndex);
+
+        var newTile = new Tile { tileId = tileId, rotation = rotation };
+        onTileCreate?.Invoke(worldTilePos, cluster, localPos, newTile, t.probMap);
+
+        // Observe this map position
+        cluster.SetTile(localClusterIndex, newTile);
+
+        // Remove this, no need to keep the probability list
+        cluster.SetProb(localClusterIndex, null);
+
+        // Now propagate
+        var ret = Propagate(worldTilePos.x, worldTilePos.y, worldTilePos.z, new ProbList<Tile>(newTile), true, maxDepth);
+
+        CreateTile(worldTilePos.x, worldTilePos.y, worldTilePos.z);
+
+        return ret;
+    }
 }

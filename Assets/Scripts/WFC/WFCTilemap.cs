@@ -9,6 +9,7 @@ using Unity.AI.Navigation;
 using NaughtyAttributes;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
+using System;
 
 [ExecuteInEditMode]
 public class WFCTilemap : MonoBehaviour
@@ -192,7 +193,7 @@ public class WFCTilemap : MonoBehaviour
         return (byte)Mathf.RoundToInt(angle / 90.0f);
     }
 
-    Vector3Int WorldToTilePos(Vector3 worldPos)
+    public Vector3Int WorldToTilePos(Vector3 worldPos)
     {
         Vector3 localPos = transform.worldToLocalMatrix.MultiplyPoint3x4(worldPos);
 
@@ -918,5 +919,10 @@ public class WFCTilemap : MonoBehaviour
         Vector3 p = localBounds.min + gridSize * 0.5f + new Vector3(pos.x * gridSize.x, pos.y * gridSize.y, pos.z * gridSize.z);
 
         Gizmos.DrawWireCube(p, gridSize);
+    }
+
+    internal void ObserveTile(Vector3Int worldTilePos, byte tileId, byte rotation)
+    {
+        tilemap.Observe(worldTilePos, tileId, rotation);
     }
 }
