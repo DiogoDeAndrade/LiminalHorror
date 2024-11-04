@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 85843765}
   - component: {fileID: 85843764}
   - component: {fileID: 85843763}
+  - component: {fileID: 85843767}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -221,6 +222,23 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &85843767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 85843762}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6fc8a1e9dd21634a9cb00402422ec6c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _showInfo: 1
+  _explanation: 
+  description: 
+  hypertags:
+  - {fileID: 11400000, guid: 5151aeb195608c948b79a2af1641e9ec, type: 2}
 --- !u!1 &269509600
 GameObject:
   m_ObjectHideFlags: 0
@@ -232,6 +250,7 @@ GameObject:
   - component: {fileID: 269509601}
   - component: {fileID: 269509602}
   - component: {fileID: 269509603}
+  - component: {fileID: 269509604}
   m_Layer: 0
   m_Name: TerrorManager
   m_TagString: Untagged
@@ -251,7 +270,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 279715280}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &269509602
@@ -269,6 +289,7 @@ MonoBehaviour:
   player: {fileID: 1013689264}
   gameOver: {fileID: 643164946}
   gameOverScream: {fileID: 8300000, guid: e7da392158be4dc449bba6b457d3b2de, type: 3}
+  seenCat: {fileID: 0}
 --- !u!114 &269509603
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -283,10 +304,112 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   type: 0
   retrigger: 1
+  distanceWalked: 0
   initialInterval: {x: 15.668508, y: 38.812153}
   repeatInterval: {x: 48.53591, y: 197.74585}
-  eventObjectPrefab: {fileID: 8643355403753639462, guid: 68d63dc80f3095b4dbb48af2448e8a2c, type: 3}
+  eventObjectPrefab: {fileID: 6775306233810124281, guid: 68d63dc80f3095b4dbb48af2448e8a2c, type: 3}
   cheatKey: 282
+--- !u!114 &269509604
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 269509600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f7ff6d03b44f7d48ba8c14a0fcd0d6f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  type: 1
+  retrigger: 1
+  distanceWalked: 100
+  initialInterval: {x: 10, y: 10}
+  repeatInterval: {x: 10, y: 10}
+  eventObjectPrefab: {fileID: 3032316914302067099, guid: bd7a3b0239a38764e8d47d8ea82ed448, type: 3}
+  cheatKey: 283
+--- !u!1 &279715279
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 279715280}
+  - component: {fileID: 279715282}
+  - component: {fileID: 279715281}
+  m_Layer: 0
+  m_Name: ResetVars
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &279715280
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 279715279}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 269509601}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &279715281
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 279715279}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bb749f9fa0d36840b27121330707a95, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _showInfo: 1
+  _explanation: Resets variable SeenCat
+  description: 
+  enableAction: 1
+  hasTags: 0
+  actionTags: []
+  hasConditions: 0
+  actionConditions: []
+  valueHandler: {fileID: 0}
+  variable: {fileID: 11400000, guid: 6d89fbdc50c57c442b94a1c29cea8e18, type: 2}
+  operation: 0
+  changeValue: 0
+  changeValueHandler: {fileID: 0}
+  changeVariable: {fileID: 0}
+  scaleWithTime: 0
+--- !u!114 &279715282
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 279715279}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe33e4a0e2979294d8e04d307e34bb03, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _showInfo: 1
+  _explanation: "When this object is created:\n          resets variable SeenCat\n"
+  description: 
+  enableTrigger: 1
+  allowRetrigger: 1
+  hasPreconditions: 0
+  preConditions: []
+  actions:
+  - delay: 0
+    action: {fileID: 279715281}
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

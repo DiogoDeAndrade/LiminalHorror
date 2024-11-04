@@ -9,6 +9,8 @@ This month, the theme is "Backrooms".
 
 - Backrooms wallpaper texture (https://skfb.ly/o9z6n) by Scans and textures is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
 - Backrooms carpet texture (https://skfb.ly/oJ9Uu) by wilderberry5150 is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+- "An Animated Cat" (https://skfb.ly/6YPwH) by Evil_Katz is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+- Speaker icons created by Freepik - Flaticon
 - Everything else done by [Diogo de Andrade], licensed through the [CC0] license.
 
 ## Sound
@@ -16,6 +18,9 @@ This month, the theme is "Backrooms".
 - Light Bulb Buzzing  by IESP -- https://freesound.org/s/340022/ -- License: [CC-BY 3.0]
 - Breaker-1.wav by Deathscyp -- https://freesound.org/s/404049/ -- License: [CC0]
 - helmutscream_short.wav by creativeheroes -- https://freesound.org/s/84353/ -- [CC-BY-SA 4.0]
+- cat meow II by tuberatanka -- https://freesound.org/s/110010/ -- License: [CC0]
+- Misha purrs by AstronautDown -- https://freesound.org/s/376378/ -- License: [CC0]
+- catAttack.wav by Zabuhailo -- https://freesound.org/s/146972/ -- License: [CC0]
 - Everything else done by [Diogo de Andrade], licensed through the [CC0] license.
 
 ## Code

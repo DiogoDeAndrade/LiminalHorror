@@ -10,6 +10,8 @@ using NaughtyAttributes;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
 using System;
+using static WFCTilemap;
+using UnityEngine.Tilemaps;
 
 [ExecuteInEditMode]
 public class WFCTilemap : MonoBehaviour
@@ -23,7 +25,7 @@ public class WFCTilemap : MonoBehaviour
     [SerializeField, HideIf("hasData")]
     private TextAsset       adjacencyData;
     [SerializeField] 
-    private Vector3         gridSize = Vector3.one;
+    public Vector3          gridSize = Vector3.one;
     [SerializeField] 
     private Vector3Int      mapSize = Vector3Int.zero;
     [SerializeField, HideIf("hasAnyData")] 
@@ -78,6 +80,9 @@ public class WFCTilemap : MonoBehaviour
 
     private WFCTileData     tilemap;
 
+    public delegate void OnNewCluster(WFCTileData.Cluster cluster);
+    public event OnNewCluster onNewCluster;
+
     private void Awake()
     {
         if (!Application.isPlaying) return;
@@ -94,7 +99,6 @@ public class WFCTilemap : MonoBehaviour
             if (buildNavmesh) UpdateNavMesh();
         }
     }
-
 
     void InstantiateMap()
     {
@@ -167,6 +171,7 @@ public class WFCTilemap : MonoBehaviour
         tilemap.SetMaxDepth(maxDepth);
         tilemap.DisableClusterObject();
         tilemap.SetPooling(usePooling, poolingContainer);
+        tilemap.onNewCluster += (cluster) => { onNewCluster?.Invoke(cluster); };
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -324,6 +329,7 @@ public class WFCTilemap : MonoBehaviour
             tilemap.SetLimits(minMapLimit, maxMapLimit);
             tilemap.SetMaxDepth(maxDepth);
             tilemap.SetPooling(usePooling, poolingContainer);
+            tilemap.onNewCluster += (cluster) => { onNewCluster?.Invoke(cluster); };
 
             // Read the tile data
             int tileCount = mapSize.x * mapSize.y * mapSize.z;
@@ -502,6 +508,7 @@ public class WFCTilemap : MonoBehaviour
             tilemap.SetAdjacencyInfo(adjacencyInfo);
             tilemap.SetMaxDepth(maxDepth);
             tilemap.SetPooling(usePooling, poolingContainer);
+            tilemap.onNewCluster += (cluster) => { onNewCluster?.Invoke(cluster); };
         }
 
         Debug.Log("Adjacency data loaded successfully!");
@@ -706,6 +713,9 @@ public class WFCTilemap : MonoBehaviour
             var activeClusters = new List<WFCTileData.Cluster>(tilemap.currentClusters);
             foreach (var cluster in tilemap.currentClusters)
             {
+                // Never destroy persistent clusters (linked to events, basically)
+                if (cluster.persistent) continue;
+
                 // Get cluster world position
                 Vector3 clusterCenter = cluster.basePos;
                 clusterCenter.x = (clusterCenter.x + 0.5f ) * gridSize.x * tilemap.clusterSize.x;

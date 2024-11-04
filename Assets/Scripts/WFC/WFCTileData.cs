@@ -137,6 +137,8 @@ public class WFCTileData
     public event OnPropagate onPropagate;
     public delegate void OnConflict(Vector3Int worldPos);
     public event OnConflict onConflict;
+    public delegate void OnNewCluster(WFCTileData.Cluster cluster);
+    public event OnNewCluster onNewCluster;
 
     public class WFCTile
     {
@@ -156,6 +158,7 @@ public class WFCTileData
         public  WFCTile[]   map;
         public  Transform   container;
         public  Vector3Int  clusterSize;
+        public  bool        persistent;
 
         public Cluster(Vector3Int basePos, ProbList<Tile> uniqueTiles, Vector3Int clusterSize, Transform container)
         {
@@ -378,8 +381,8 @@ public class WFCTileData
 
     public void SetPooling(bool enable, Transform container = null)
     {
-        this.poolEnable = enable;
-        this.poolContainer = container;
+        poolEnable = enable;
+        poolContainer = container;
     }
 
     // Create or retrieve the cluster
@@ -389,6 +392,8 @@ public class WFCTileData
         {
             var cluster = new Cluster(clusterPos, uniqueTiles, clusterSize, (clusterObjectEnable) ? (container) : (null));
             clusters[clusterPos] = cluster;
+
+            onNewCluster?.Invoke(cluster);
 
             // Initialize this cluster based on the data around it - THIS DOESN'T WORK FOR 3D, only for 2D (XZ) - Future work maybe
             // Get corner pos

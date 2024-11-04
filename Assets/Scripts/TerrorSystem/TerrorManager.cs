@@ -8,10 +8,13 @@ public class TerrorManager : MonoBehaviour
     [SerializeField] private FPSController player;
     [SerializeField] private CanvasGroup   gameOver;
     [SerializeField] private AudioClip     gameOverScream;
+    [SerializeField] private Variable      seenCat;
 
     WFCTilemap          tilemap;
     CharacterController charCtrl;
     Coroutine           gameoverCR;
+
+    public bool isGameOver => (gameoverCR != null) || (gameOver.alpha > 0.0f);
 
     void Start()
     {

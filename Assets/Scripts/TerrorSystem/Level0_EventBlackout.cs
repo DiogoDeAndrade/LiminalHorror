@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using OkapiKit;
 
-public class Level0_EventBlackout : MonoBehaviour
+public class Level0_EventBlackout : TerrorObject
 {
     [SerializeField] private float      radius = 20.0f;
     [SerializeField] private float      duration = 10.0f;
@@ -21,7 +21,6 @@ public class Level0_EventBlackout : MonoBehaviour
     }
     
     private ParticleSystem  smilerPS;
-    private FPSController   player;
     private List<ElemData>  lights;
     private float           timer;
     private Color           originalEnvColor;
@@ -30,9 +29,10 @@ public class Level0_EventBlackout : MonoBehaviour
     private float           psInitialRate;
     private float           psInitialRadius;
 
-    void Start()
+    protected override void Start()
     {
-        player = FindAnyObjectByType<FPSController>();
+        base.Start();
+
         smilerPS = GetComponentInChildren<ParticleSystem>();
 
         lights = new();
@@ -110,7 +110,6 @@ public class Level0_EventBlackout : MonoBehaviour
 
             if (t == 1)
             {
-                var terrorManager = FindAnyObjectByType<TerrorManager>();
                 terrorManager.GameOver();
             }
         }
