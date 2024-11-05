@@ -1,10 +1,13 @@
 using NaughtyAttributes;
+using OkapiKit;
 using UnityEngine;
 
 public class TerrorEvent : MonoBehaviour
 {
     public enum TriggerType { Time, DistanceWalked };
 
+    [SerializeField]
+    private Variable[]      preconditions;
     [SerializeField] 
     private TriggerType     type;
     [SerializeField] 
@@ -40,6 +43,18 @@ public class TerrorEvent : MonoBehaviour
     {
         if (currentEvent == null)
         {
+            bool canRun = true;
+            if ((preconditions != null) && (preconditions.Length > 0))
+            {
+                foreach (var condition in preconditions)
+                {
+                    if (condition.currentValue < 1)
+                    {
+                        canRun = false;
+                    }
+                }
+            }
+
             if (cheatKey != KeyCode.None)
             {
                 if (Input.GetKeyDown(cheatKey))
@@ -49,30 +64,33 @@ public class TerrorEvent : MonoBehaviour
                 }
             }
 
-            switch (type)
+            if (canRun)
             {
-                case TriggerType.Time:
-                    timer -= Time.deltaTime;
-                    if (timer < 0.0f)
-                    {
-                        if (TriggerEvent())
+                switch (type)
+                {
+                    case TriggerType.Time:
+                        timer -= Time.deltaTime;
+                        if (timer < 0.0f)
                         {
-                            timer = repeatInterval.Random();
+                            if (TriggerEvent())
+                            {
+                                timer = repeatInterval.Random();
+                            }
                         }
-                    }
-                    break;
-                case TriggerType.DistanceWalked:
-                    currentDistanceWalked += Vector3.Distance(player.transform.position, prevPlayerPos);
-                    if (currentDistanceWalked > distanceWalked)
-                    {
-                        if (TriggerEvent())
+                        break;
+                    case TriggerType.DistanceWalked:
+                        currentDistanceWalked += Vector3.Distance(player.transform.position, prevPlayerPos);
+                        if (currentDistanceWalked > distanceWalked)
                         {
-                            currentDistanceWalked = 0.0f;
+                            if (TriggerEvent())
+                            {
+                                currentDistanceWalked = 0.0f;
+                            }
                         }
-                    }
-                    break;
-                default:
-                    break;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 

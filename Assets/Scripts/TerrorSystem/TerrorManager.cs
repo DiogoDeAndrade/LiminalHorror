@@ -7,14 +7,14 @@ public class TerrorManager : MonoBehaviour
 {
     [SerializeField] private FPSController player;
     [SerializeField] private CanvasGroup   gameOver;
+    [SerializeField] private CanvasGroup   toBeContinued;
     [SerializeField] private AudioClip     gameOverScream;
-    [SerializeField] private Variable      seenCat;
 
     WFCTilemap          tilemap;
     CharacterController charCtrl;
-    Coroutine           gameoverCR;
+    Coroutine           fadeCR;
 
-    public bool isGameOver => (gameoverCR != null) || (gameOver.alpha > 0.0f);
+    public bool isFading => (fadeCR != null) || (gameOver.alpha > 0.0f) || (toBeContinued.alpha > 0.0f);
 
     void Start()
     {
@@ -22,6 +22,7 @@ public class TerrorManager : MonoBehaviour
         charCtrl = player.GetComponent<CharacterController>();
 
         gameOver.alpha = 0.0f;
+        toBeContinued.alpha = 0.0f;
 
         StartCoroutine(StartCR());
     }
@@ -48,11 +49,16 @@ public class TerrorManager : MonoBehaviour
 
     public void GameOver()
     {
-        if (gameoverCR != null) return;
-        gameoverCR = StartCoroutine(GameOverCR());
+        if (fadeCR != null) return;
+        fadeCR = StartCoroutine(FadeEndCR(gameOverScream, gameOver, 0));
+    }
+    public void ToBeContinued()
+    {
+        if (fadeCR != null) return;
+        fadeCR = StartCoroutine(FadeEndCR(null, toBeContinued, -1));
     }
 
-    IEnumerator GameOverCR()
+    IEnumerator FadeEndCR(AudioClip sound, CanvasGroup canvasGroup, int nextScene)
     {
         charCtrl.enabled = false;
         player.enabled = false;
@@ -63,11 +69,11 @@ public class TerrorManager : MonoBehaviour
             te.enabled = false;
         }
 
-        SoundManager.PlaySound(gameOverScream);
+        if (sound) SoundManager.PlaySound(sound);
 
-        while (gameOver.alpha < 1.0f)
+        while (canvasGroup.alpha < 1.0f)
         {
-            gameOver.alpha = Mathf.Clamp01(gameOver.alpha + Time.deltaTime * 4.0f);
+            canvasGroup.alpha = Mathf.Clamp01(canvasGroup.alpha + Time.deltaTime * 4.0f);
             yield return null;
         }
 
@@ -83,6 +89,7 @@ public class TerrorManager : MonoBehaviour
             yield return null;
         }
 
-        SceneManager.LoadScene(0);
+        if (nextScene >= 0) SceneManager.LoadScene(nextScene);
+        else Application.Quit();
     }
 }

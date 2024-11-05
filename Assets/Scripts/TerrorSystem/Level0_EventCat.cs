@@ -33,8 +33,6 @@ public class Level0_EventCat : TerrorObject
         actualObjects.SetActive(false);
 
         tilemap.onNewCluster += GenerateCatCluster;
-
-        //audioIcon.onVisibilityCallback += (Transform trackedSound) => { return trackedSound.GetComponent<AudioSource>().isPlaying; };
     }
 
     private void OnDestroy()
@@ -79,7 +77,7 @@ public class Level0_EventCat : TerrorObject
 
             if (maxDist < 2.0f)
             {
-                if ((!terrorManager.isGameOver) && (deathCR == null))
+                if ((!terrorManager.isFading) && (deathCR == null))
                 {
                     deathCR = StartCoroutine(DeathCR());
                 }
@@ -105,17 +103,18 @@ public class Level0_EventCat : TerrorObject
                                               Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.clusterSize.z));
         ClearArea(centerPos, 2);
 
+        transform.position = new Vector3(centerPos.x * tilemap.gridSize.x,
+                                         centerPos.y * tilemap.gridSize.y,
+                                         centerPos.z * tilemap.gridSize.z);
+
+        actualObjects.SetActive(true);
+
         if (initialMeowSnd)
         {
             SoundManager.PlaySound(initialMeowSnd);
             meowSound.Play();
             meowTimer = meowInterval.Random();
         }
-
-        transform.position = new Vector3(centerPos.x * tilemap.gridSize.x,
-                                         centerPos.y * tilemap.gridSize.y,
-                                         centerPos.z * tilemap.gridSize.z);
-        actualObjects.SetActive(true);
     }
 
     IEnumerator DeathCR()
