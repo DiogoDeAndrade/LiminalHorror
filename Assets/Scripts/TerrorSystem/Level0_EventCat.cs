@@ -20,14 +20,11 @@ public class Level0_EventCat : TerrorObject
     [SerializeField]
     Transform      smileyCat;
     [SerializeField]
-    CanvasObjectLockTo3d audioIconPrefab;
-    [SerializeField]
-    OkapiKit.Hypertag    canvasTag;
+    Sprite         audioIconSprite;
 
     float                   meowTimer;
     WFCTileData.Cluster     catCluster;
     Coroutine               deathCR;
-    CanvasObjectLockTo3d    audioIcon;
 
     protected override void Start()
     {
@@ -37,18 +34,13 @@ public class Level0_EventCat : TerrorObject
 
         tilemap.onNewCluster += GenerateCatCluster;
 
-        Canvas canvas = gameObject.FindObjectOfTypeWithHypertag<Canvas>(canvasTag);
-        audioIcon = Instantiate(audioIconPrefab, canvas.transform);
-        audioIcon.sourceTransform = meowSound.transform;
-        audioIcon.gameObject.SetActive(false);
+        //audioIcon.onVisibilityCallback += (Transform trackedSound) => { return trackedSound.GetComponent<AudioSource>().isPlaying; };
     }
 
     private void OnDestroy()
     {
         if (catCluster != null) catCluster.persistent = false;
         tilemap.onNewCluster -= GenerateCatCluster;
-
-        Destroy(audioIcon.gameObject);
     }
 
     private void Update()
@@ -64,8 +56,6 @@ public class Level0_EventCat : TerrorObject
                 meowTimer = meowInterval.Random();
             }
         }
-
-        audioIcon.gameObject.SetActive(meowSound.isPlaying);
 
         // Check for LOS on cat
         Ray ray = new Ray();
