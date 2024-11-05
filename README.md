@@ -31,6 +31,11 @@ This month, the theme is "Backrooms".
 - Water splash, emptying a bucket 3 by wormer2 -- https://freesound.org/s/415669/ -- License: [CC0]
 - SPLASH (by blaukreuz) by qubodup -- https://freesound.org/s/212143/ -- License: [CC0]
 - 130723_Brela_HarborJump_F_4824.wav by blaukreuz -- https://freesound.org/s/195877/ -- License: [CC0]
+- tram curve scratching metal sound effect by Garuda1982 -- https://freesound.org/s/565057/ -- License: [CC-BY-SA 4.0]
+- Cardboard Surface Scratching 1_2 by Joao_Janz -- https://freesound.org/s/477672/ -- License: [CC0]
+- scratching.wav by Reitanna -- https://freesound.org/s/323735/ -- License: [CC0]
+- Leather Rubbing Foley Sound by ALLANZ10D -- https://freesound.org/s/269761/ -- License: [CC0]
+- Multiple Pipe Banging Metal Hit Sound Effects by DanJFilms -- https://freesound.org/s/687242/ -- License: [CC0]
 - Voice generated using ElevenLabs
 - Everything else done by [Diogo de Andrade], licensed through the [CC0] license.
 
