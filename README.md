@@ -5,6 +5,18 @@ This month, the theme is "Backrooms".
 
 ## Game
 
+![Image](Screenshots/screen01.png)
+
+This game is a very short suspense game based on the Backroom mythos. 
+It currently only has one floor, and the objective is to figure out how to escape.
+Controls are normal FPS controls.
+
+![Image](Screenshots/screen02.png)
+
+The interesting part is that the game uses Wave Function Collapse to generate an infinite level, based on a provided template.
+
+![Image](Screenshots/screen03.png)
+
 ## Art
 
 - [Backrooms wallpaper texture](https://skfb.ly/o9z6n) by Scans and textures is licensed under [CC-BY 4.0].
@@ -13,6 +25,7 @@ This month, the theme is "Backrooms".
 - Speaker icons created by Freepik - Flaticon
 - [Old Phone](https://www.fab.com/listings/122e8983-ee34-425e-8e55-1fc1183d4d73) by [Gorzi](https://www.fab.com/sellers/Gorzi), licensed under [CC-BY 4.0].
 - [Table](https://www.fab.com/listings/9b697747-ffca-4457-80ae-7f21732377ac) by [plaggy](https://www.fab.com/sellers/plaggy), licensed under [CC-BY 4.0].
+- [Eas VHS font](https://www.dafont.com/pt/easvhs.font) by [rurr](https://www.dafont.com/pt/rurr.d10722), free to use
 - Everything else done by [Diogo de Andrade], licensed through the [CC0] license.
 
 ## Sound

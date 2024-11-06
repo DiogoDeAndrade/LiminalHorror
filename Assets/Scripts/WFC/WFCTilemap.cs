@@ -745,6 +745,7 @@ public class WFCTilemap : MonoBehaviour
     static Vector3Int? debugHoveredTile = null;
     static List<(Vector3Int p1, Vector3Int p2)> debugPropagations = new();
 
+#if UNITY_EDITOR
     private void OnEnable()
     {
         // Subscribe to the Scene view event
@@ -755,6 +756,12 @@ public class WFCTilemap : MonoBehaviour
     {
         // Unsubscribe when disabled
         SceneView.duringSceneGui -= OnSceneGUI;
+    }
+#endif
+
+    internal void ObserveTile(Vector3Int worldTilePos, byte tileId, byte rotation)
+    {
+        tilemap.Observe(worldTilePos, tileId, rotation);
     }
 
     private void OnDrawGizmos()
@@ -850,6 +857,31 @@ public class WFCTilemap : MonoBehaviour
         Gizmos.matrix = prevMatrix;
     }
 
+    private void DrawXZGrid(float y)
+    {
+        Vector3 min = localBounds.min;
+        Vector3 max = localBounds.max;
+
+        for (int z = 0; z <= mapSize.z; z++)
+        {
+            Gizmos.DrawLine(new Vector3(min.x, y, min.z + gridSize.z * z),
+                            new Vector3(max.x, y, min.z + gridSize.z * z));
+        }
+        for (int x = 0; x <= mapSize.x; x++)
+        {
+            Gizmos.DrawLine(new Vector3(min.x + gridSize.x * x, y, min.z),
+                            new Vector3(min.x + gridSize.x * x, y, max.z));
+        }
+    }
+
+    private void DrawGridPos(Vector3Int pos)
+    {
+        Vector3 p = localBounds.min + gridSize * 0.5f + new Vector3(pos.x * gridSize.x, pos.y * gridSize.y, pos.z * gridSize.z);
+
+        Gizmos.DrawWireCube(p, gridSize);
+    }
+
+#if UNITY_EDITOR
     void OnSceneGUI(SceneView view)
     { 
         if ((cellInfo) && (tilemap != null))
@@ -937,33 +969,5 @@ public class WFCTilemap : MonoBehaviour
             }
         }
     }
-
-    private void DrawXZGrid(float y)
-    {
-        Vector3 min = localBounds.min;
-        Vector3 max = localBounds.max;
-
-        for (int z = 0; z <= mapSize.z; z++)
-        {
-            Gizmos.DrawLine(new Vector3(min.x, y, min.z + gridSize.z * z),
-                            new Vector3(max.x, y, min.z + gridSize.z * z));
-        }
-        for (int x = 0; x <= mapSize.x; x++)
-        {
-            Gizmos.DrawLine(new Vector3(min.x + gridSize.x * x, y, min.z),
-                            new Vector3(min.x + gridSize.x * x, y, max.z));
-        }
-    }
-
-    private void DrawGridPos(Vector3Int pos)
-    {
-        Vector3 p = localBounds.min + gridSize * 0.5f + new Vector3(pos.x * gridSize.x, pos.y * gridSize.y, pos.z * gridSize.z);
-
-        Gizmos.DrawWireCube(p, gridSize);
-    }
-
-    internal void ObserveTile(Vector3Int worldTilePos, byte tileId, byte rotation)
-    {
-        tilemap.Observe(worldTilePos, tileId, rotation);
-    }
+#endif
 }

@@ -1,3 +1,4 @@
+using NaughtyAttributes;
 using OkapiKit;
 using System.Collections;
 using UnityEngine;
@@ -9,6 +10,7 @@ public class TerrorManager : MonoBehaviour
     [SerializeField] private CanvasGroup   gameOver;
     [SerializeField] private CanvasGroup   toBeContinued;
     [SerializeField] private AudioClip     gameOverScream;
+    [SerializeField, Scene] private string titleScene;
 
     WFCTilemap          tilemap;
     CharacterController charCtrl;
@@ -50,15 +52,15 @@ public class TerrorManager : MonoBehaviour
     public void GameOver()
     {
         if (fadeCR != null) return;
-        fadeCR = StartCoroutine(FadeEndCR(gameOverScream, gameOver, 0));
+        fadeCR = StartCoroutine(FadeEndCR(gameOverScream, gameOver, titleScene));
     }
     public void ToBeContinued()
     {
         if (fadeCR != null) return;
-        fadeCR = StartCoroutine(FadeEndCR(null, toBeContinued, -1));
+        fadeCR = StartCoroutine(FadeEndCR(null, toBeContinued, titleScene));
     }
 
-    IEnumerator FadeEndCR(AudioClip sound, CanvasGroup canvasGroup, int nextScene)
+    IEnumerator FadeEndCR(AudioClip sound, CanvasGroup canvasGroup, string nextScene)
     {
         charCtrl.enabled = false;
         player.enabled = false;
@@ -89,7 +91,9 @@ public class TerrorManager : MonoBehaviour
             yield return null;
         }
 
-        if (nextScene >= 0) SceneManager.LoadScene(nextScene);
-        else Application.Quit();
+        FullscreenFader.FadeOut(0.5f, Color.black, () =>
+        {
+            SceneManager.LoadScene(nextScene);
+        });
     }
 }
