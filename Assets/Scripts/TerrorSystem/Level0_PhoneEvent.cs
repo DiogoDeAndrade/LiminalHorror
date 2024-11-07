@@ -105,17 +105,17 @@ public class Level0_PhoneEvent : TerrorObject
 
     IEnumerator NextLevelCR()
     {
-        var snd = SoundManager.PlaySound(pickupPhoneSnd);
+        var snd = SoundManager.PlaySound(SoundType.PrimaryFX, pickupPhoneSnd);
 
         yield return new WaitForSound(snd);
         yield return new WaitForSeconds(0.5f);
 
-        snd = SoundManager.PlaySound(voiceOnTheOtherSideSnd);
+        snd = SoundManager.PlaySound(SoundType.PrimaryFX, voiceOnTheOtherSideSnd);
 
         yield return new WaitForSound(snd);
         yield return new WaitForSeconds(0.5f);
 
-        snd = SoundManager.PlaySound(pickupPhoneSnd);
+        snd = SoundManager.PlaySound(SoundType.PrimaryFX, pickupPhoneSnd);
 
         yield return new WaitForSound(snd);
         yield return new WaitForSeconds(0.5f);
@@ -125,7 +125,7 @@ public class Level0_PhoneEvent : TerrorObject
 
         yield return new WaitForSeconds(2.0f);
 
-        SoundManager.PlaySound(splashSnd);
+        SoundManager.PlaySound(SoundType.PrimaryFX, splashSnd);
 
         terrorManager.ToBeContinued();
     }

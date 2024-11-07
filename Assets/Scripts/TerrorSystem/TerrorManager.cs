@@ -71,7 +71,7 @@ public class TerrorManager : MonoBehaviour
             te.enabled = false;
         }
 
-        if (sound) SoundManager.PlaySound(sound);
+        if (sound) SoundManager.PlaySound(SoundType.PrimaryFX, sound);
 
         while (canvasGroup.alpha < 1.0f)
         {

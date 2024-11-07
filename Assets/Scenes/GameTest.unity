@@ -863,7 +863,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 421991096}
-  - component: {fileID: 421991095}
+  - component: {fileID: 421991097}
   m_Layer: 0
   m_Name: SoundManager
   m_TagString: Untagged
@@ -871,22 +871,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &421991095
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 421991094}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d2693f9c8caf81046837996718175889, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _showInfo: 1
-  _explanation: This system is responsible for playing all sounds in the game
-  description: 
-  defaultMixerOutput: {fileID: -1569758023143966757, guid: 2c815274edb49c247befc399a52e705f, type: 2}
 --- !u!4 &421991096
 Transform:
   m_ObjectHideFlags: 0
@@ -902,6 +886,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &421991097
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 421991094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9cd9bdef310e4be43a721c25ecfa6043, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultMixerOutput: {fileID: -1569758023143966757, guid: 2c815274edb49c247befc399a52e705f, type: 2}
+  musicMixerGroup: {fileID: 0}
+  fx1MixerGroup: {fileID: 0}
+  fx2MixerGroup: {fileID: 0}
+  backgroundMixerGroup: {fileID: 0}
+  voiceMixerGroup: {fileID: 0}
 --- !u!1001 &529821944
 PrefabInstance:
   m_ObjectHideFlags: 0

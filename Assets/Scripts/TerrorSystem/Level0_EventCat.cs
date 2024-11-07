@@ -111,7 +111,7 @@ public class Level0_EventCat : TerrorObject
 
         if (initialMeowSnd)
         {
-            SoundManager.PlaySound(initialMeowSnd);
+            SoundManager.PlaySound(SoundType.PrimaryFX, initialMeowSnd);
             meowSound.Play();
             meowTimer = meowInterval.Random();
         }
@@ -120,7 +120,7 @@ public class Level0_EventCat : TerrorObject
     IEnumerator DeathCR()
     {
         // DEATH!
-        SoundManager.PlaySound(catAttack);
+        SoundManager.PlaySound(SoundType.PrimaryFX, catAttack);
 
         Vector3 toPlayer = ((player.transform.position + Vector3.up * 1.2f) - smileyCat.transform.position).normalized;
         smileyCat.transform.rotation = Quaternion.LookRotation(toPlayer, Vector3.up);

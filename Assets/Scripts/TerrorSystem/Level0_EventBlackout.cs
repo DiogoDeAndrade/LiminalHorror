@@ -74,7 +74,7 @@ public class Level0_EventBlackout : TerrorObject
         originalEnvColor = RenderSettings.ambientLight;
         RenderSettings.ambientLight = blackoutEnvColor;
 
-        if (soundFX) SoundManager.PlaySound(soundFX);
+        if (soundFX) SoundManager.PlaySound(SoundType.PrimaryFX, soundFX);
 
         foreach (var light in lights)
         {
@@ -117,7 +117,7 @@ public class Level0_EventBlackout : TerrorObject
         timer -= Time.deltaTime;
         if (timer <= 0.0f)
         {
-            if (soundFX) SoundManager.PlaySound(soundFX);
+            if (soundFX) SoundManager.PlaySound(SoundType.PrimaryFX, soundFX);
             RenderSettings.ambientLight = originalEnvColor;
             foreach (var light in lights)
             {
