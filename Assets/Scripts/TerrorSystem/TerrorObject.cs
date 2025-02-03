@@ -21,7 +21,7 @@ public class TerrorObject : MonoBehaviour
     protected void ClearArea(Vector3Int pos, int radius)
     {
         // Clear the area in the middle
-        var worldTilePos = tilemap.WorldToTilePos(pos);
+        var worldTilePos = tilemap.GetWorldPosFromTilePos(pos);
         for (int z = -radius; z <= radius; z++)
         {
             for (int x = -radius; x <= radius; x++)

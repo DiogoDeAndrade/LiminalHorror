@@ -89,18 +89,18 @@ public class Level0_EventCat : TerrorObject
         }
     }
 
-    public void GenerateCatCluster(WFCTileData.Cluster cluster)
+    public void GenerateCatCluster(WFCCluster cluster)
     {
-        catCluster = cluster;
+        catCluster = cluster.cluster;
         catCluster.persistent = true;
 
-        transform.SetParent(catCluster.container, true);
+        transform.SetParent(cluster.transform, true);
 
         tilemap.onNewCluster -= GenerateCatCluster;
 
-        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((cluster.basePos.x + 0.5f) * cluster.clusterSize.x),
-                                              cluster.basePos.y * cluster.clusterSize.y,
-                                              Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.clusterSize.z));
+        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((catCluster.basePos.x + 0.5f) * catCluster.clusterSize.x),
+                                              catCluster.basePos.y * catCluster.clusterSize.y,
+                                              Mathf.FloorToInt((catCluster.basePos.z + 0.5f) * catCluster.clusterSize.z));
         ClearArea(centerPos, 2);
 
         transform.position = new Vector3(centerPos.x * tilemap.gridSize.x,

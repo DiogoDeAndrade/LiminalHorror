@@ -34,7 +34,7 @@ public class TerrorManager : MonoBehaviour
         tilemap.GenerateMap(() =>
         {
             // Clear the area in the middle
-            var worldTilePos = tilemap.WorldToTilePos(player.transform.position);
+            var worldTilePos = tilemap.GetWorldPosFromTilePos(player.transform.position);
             for (int z = -3; z <= 3; z++)
             {
                 for (int x = -3; x <= 3; x++)

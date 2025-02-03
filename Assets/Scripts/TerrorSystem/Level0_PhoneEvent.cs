@@ -81,18 +81,18 @@ public class Level0_PhoneEvent : TerrorObject
         }
     }
 
-    public void GenerateCluster(WFCTileData.Cluster cluster)
+    public void GenerateCluster(WFCCluster cluster)
     {
-        phoneCluster = cluster;
+        phoneCluster = cluster.cluster;
         phoneCluster.persistent = true;
 
-        transform.SetParent(phoneCluster.container, true);
+        transform.SetParent(cluster.transform, true);
 
         tilemap.onNewCluster -= GenerateCluster;
 
-        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((cluster.basePos.x + 0.5f) * cluster.clusterSize.x),
-                                              cluster.basePos.y * cluster.clusterSize.y,
-                                              Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.clusterSize.z));
+        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((phoneCluster.basePos.x + 0.5f) * phoneCluster.clusterSize.x),
+                                              phoneCluster.basePos.y * phoneCluster.clusterSize.y,
+                                              Mathf.FloorToInt((phoneCluster.basePos.z + 0.5f) * phoneCluster.clusterSize.z));
         ClearArea(centerPos, 2);
 
         transform.position = new Vector3(centerPos.x * tilemap.gridSize.x,

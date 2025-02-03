@@ -147,20 +147,18 @@ public class WFCTileData
         public ProbList<Tile>   probMap;
     }
 
-    static Dictionary<Tile, List<WFCTile3d>> tilePool = new();
-
     public delegate void SolveConflictFunction(Vector3Int pos);
     public delegate void PropagateCallbackFunction(Vector3Int prevWorldPos, Vector3Int nextWorldPos, ProbList<Tile> allowedTiles, int depth);
 
     public class Cluster
     {
-        public  Vector3Int  basePos;
-        public  WFCTile[]   map;
-        public  Transform   container;
-        public  Vector3Int  clusterSize;
-        public  bool        persistent;
+        public  Vector3Int      basePos;
+        public  WFCTile[]       map;
+        public  Vector3Int      clusterSize;
+        public  bool            persistent;
+        private WFCTilemap      parent;
 
-        public Cluster(Vector3Int basePos, ProbList<Tile> uniqueTiles, Vector3Int clusterSize, Transform container)
+        public Cluster(Vector3Int basePos, ProbList<Tile> uniqueTiles, Vector3Int clusterSize, WFCTilemap parent)
         {
             this.basePos = basePos;
             this.clusterSize = clusterSize;
@@ -176,16 +174,9 @@ public class WFCTileData
                 };
             }
 
-            if (container != null)
-            {
-                var go = new GameObject();
-                go.name = $"Cluster {basePos.x},{basePos.y},{basePos.z}";
-                go.transform.parent = container;
-                go.transform.localPosition = Vector3.zero;
-                go.AddComponent<WFCCluster>();
+            this.parent = parent;
 
-                this.container = go.transform;
-            }
+            parent.threadData.GetClusterTransform(this, false);
         }
 
         public Tile GetTile(int index) => map[index].tile;
@@ -341,17 +332,15 @@ public class WFCTileData
     ProbList<Tile>      uniqueTiles;
     List<WFCData>       adjacencyInfo;
     List<WFCTile3d>     conflictTiles;
-    Transform           container;  
-    bool                poolEnable;
-    Transform           poolContainer;
+    WFCThreadData       threadData;
 
-    public WFCTileData(Vector3Int initialSize, Vector3 gridSize, WFCTileset tileset, List<WFCTile3d> conflictTiles, Transform container)
+    public WFCTileData(Vector3Int initialSize, Vector3 gridSize, WFCTileset tileset, List<WFCTile3d> conflictTiles, WFCThreadData threadData)
     {
         this.tileset = tileset;
         this.clusterSize = new Vector3Int(Mathf.Min(8, initialSize.x), Mathf.Min(8, initialSize.y), Mathf.Min(8, initialSize.z)); ;
         this.gridSize = gridSize;
         this.conflictTiles = conflictTiles;
-        this.container = container;
+        this.threadData = threadData;
     }
 
     public void SetUniqueTiles(ProbList<Tile> uniqueTiles)
@@ -379,18 +368,12 @@ public class WFCTileData
         clusterObjectEnable = false;
     }
 
-    public void SetPooling(bool enable, Transform container = null)
-    {
-        poolEnable = enable;
-        poolContainer = container;
-    }
-
     // Create or retrieve the cluster
     private Cluster GetOrCreateCluster(Vector3Int clusterPos)
     {
         if (!clusters.ContainsKey(clusterPos))
         {
-            var cluster = new Cluster(clusterPos, uniqueTiles, clusterSize, (clusterObjectEnable) ? (container) : (null));
+            var cluster = new Cluster(clusterPos, uniqueTiles, clusterSize, threadData);
             clusters[clusterPos] = cluster;
 
             onNewCluster?.Invoke(cluster);
