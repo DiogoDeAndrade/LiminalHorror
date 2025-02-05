@@ -1228,6 +1228,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e551daac347a884cb84d6b27620927a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  textFile: {fileID: 0}
   text: "LPH\nA Game By Diogo de Andrade\n\nArt\n[Backrooms wallpaper texture](https://skfb.ly/o9z6n)
     by Scans and textures [CC-BY 4.0].\r\n[Backrooms carpet texture](https://skfb.ly/oJ9Uu)
     by wilderberry5150 [CC-BY 4.0].\r\n[An Animated Cat](https://skfb.ly/6YPwH) by
@@ -1260,6 +1261,15 @@ MonoBehaviour:
     game source code by Diogo de Andrade, [MIT] license.\r"
   textPrefab: {fileID: 4015462322417331130, guid: b05cfb2dcd46ef04a81967526631a03f, type: 3}
   scrollSpeed: 50
+  playerInput: {fileID: 0}
+  backControl:
+    _type: 0
+    axis: Horizontal
+    buttonPositive: Right
+    buttonNegative: Left
+    keyPositive: 275
+    keyNegative: 276
+    inputAction: 
 --- !u!114 &1231290958
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1499,7 +1509,7 @@ MonoBehaviour:
   titleContainer: {fileID: 64262073}
   optionsContainer: {fileID: 480991095}
   credits: {fileID: 1231290959}
-  gameScene: GameTest
+  gameScene: GameScene
 --- !u!1 &1468617412
 GameObject:
   m_ObjectHideFlags: 0

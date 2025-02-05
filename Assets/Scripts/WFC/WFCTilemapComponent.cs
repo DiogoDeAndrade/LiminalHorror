@@ -13,6 +13,7 @@ using static UnityEngine.Rendering.STP;
 using UnityEngine.UI;
 using OkapiKit;
 using System;
+using System.Threading;
 
 // This class bridges the generic WFC classes with Unity's system
 // Although the WFC classes use some Unity data structures, like Vector3, etc
@@ -67,6 +68,7 @@ public class WFCTilemapComponent : MonoBehaviour
     private WFCTilemap                              tilemap;
     private Dictionary<WFCCluster, Transform>       clusterObjects = new();
     private Dictionary<WFCTile3d, List<WFCTile3d>>  objectPool;
+    private WFCThread                               thread;
 
     public event OnNewCluster onNewCluster;
 
@@ -206,10 +208,7 @@ public class WFCTilemapComponent : MonoBehaviour
         config.mapSize.z = Mathf.Max(1, Mathf.FloorToInt((config.localBounds.max.z - config.localBounds.min.z) / config.gridSize.z));
 
         tilemap = new WFCTilemap(config, conflictTiles);
-        tilemap.createTileCallback = CreateTile;
-        tilemap.destroyTileCallback = DestroyTile;
-        tilemap.createClusterCallback = CreateCluster;
-        tilemap.destroyClusterCallback = DestroyCluster;
+        SetupHandlers();
 
         // Collect all tiles and initialize them
         foreach (var tile in tiles)
@@ -394,10 +393,7 @@ public class WFCTilemapComponent : MonoBehaviour
 
             // Initialize the map array with the correct size
             tilemap = new WFCTilemap(config, conflictTiles);
-            tilemap.createTileCallback = CreateTile;
-            tilemap.destroyTileCallback = DestroyTile;
-            tilemap.createClusterCallback = CreateCluster;
-            tilemap.destroyClusterCallback = DestroyCluster;
+            SetupHandlers();
 
             // Read the tile data
             int tileCount = config.mapSize.x * config.mapSize.y * config.mapSize.z;
@@ -447,6 +443,13 @@ public class WFCTilemapComponent : MonoBehaviour
             case GenResult.Complete:
                 startedWFC = false;
                 break;
+        }
+
+        if (config.multithreaded)
+        {
+            thread = new WFCThread(tilemap, this);
+            SetupHandlers();
+            thread.Start();
         }
     }
 
@@ -572,10 +575,7 @@ public class WFCTilemapComponent : MonoBehaviour
 
         // Initialize the map array with the correct size
         tilemap = new WFCTilemap(config, conflictTiles);
-        tilemap.createTileCallback = CreateTile;
-        tilemap.destroyTileCallback = DestroyTile;
-        tilemap.createClusterCallback = CreateCluster;
-        tilemap.destroyClusterCallback = DestroyCluster;
+        SetupHandlers();
 
         return true;
     }
@@ -722,86 +722,95 @@ public class WFCTilemapComponent : MonoBehaviour
     {
         if ((isDynamic) && (dynamicCamera))
         {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-
             bool updated = false;
-            int currentDistance = Mathf.CeilToInt(Mathf.Min(2, config.maxGenerationDistance * 0.1f));
-            int incDistance = currentDistance;
 
-            while (currentDistance <= config.maxGenerationDistance)
+            if (thread != null)
             {
-                Vector3[] corners = new Vector3[4];
-                dynamicCamera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), currentDistance, Camera.MonoOrStereoscopicEye.Mono, corners);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                Vector3 min = dynamicCamera.transform.position;
-                Vector3 max = dynamicCamera.transform.position;
-                for (int i = 0; i < 4; i++)
+                // Setup data required for this update tick
+                thread.SetCamera(dynamicCamera);
+                // Create/Remove clusters/tiles
+                thread.UpdateClusters();
+                thread.UpdateTiles();
+                // Show debug log information
+                thread.FlushLog();
+
+                sw.Stop();
+            }
+            else
+            {
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+
+                int currentDistance = Mathf.CeilToInt(Mathf.Min(2, config.maxGenerationDistance * 0.1f));
+                int incDistance = currentDistance;
+
+                while (currentDistance <= config.maxGenerationDistance)
                 {
-                    corners[i] = dynamicCamera.transform.localToWorldMatrix.MultiplyPoint3x4(corners[i]);
-                    if (corners[i].x < min.x) min.x = corners[i].x;
-                    if (corners[i].y < min.y) min.y = corners[i].y;
-                    if (corners[i].z < min.z) min.z = corners[i].z;
-                    if (corners[i].x > max.x) max.x = corners[i].x;
-                    if (corners[i].y > max.y) max.y = corners[i].y;
-                    if (corners[i].z > max.z) max.z = corners[i].z;
-                }
+                    (Vector3[] corners, Vector3 min, Vector3 max) = WFCHelpers.CalculateFrustumCorners(
+                        dynamicCamera.transform.localToWorldMatrix,
+                        0.0f, 0.0f, 1.0f, 1.0f, 
+                        currentDistance, 
+                        dynamicCamera.fieldOfView, dynamicCamera.aspect, dynamicCamera.orthographic, dynamicCamera.orthographicSize
+                    );
 
-                Vector3Int p1 = WorldToTilePos(min);
-                Vector3Int p2 = WorldToTilePos(max);
-                Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
-                Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
-                if (start.x < config.minMapLimit.x) start.x = config.minMapLimit.x;
-                if (start.y < config.minMapLimit.y) start.y = config.minMapLimit.y;
-                if (start.z < config.minMapLimit.z) start.z = config.minMapLimit.z;
-                if (end.x > config.maxMapLimit.x) end.x = config.maxMapLimit.x;
-                if (end.y > config.maxMapLimit.y) end.y = config.maxMapLimit.y;
-                if (end.z > config.maxMapLimit.z) end.z = config.maxMapLimit.z;
+                    Vector3Int p1 = WorldToTilePos(min);
+                    Vector3Int p2 = WorldToTilePos(max);
+                    Vector3Int start = new Vector3Int(Mathf.Min(p1.x, p2.x), Mathf.Min(p1.y, p2.y), Mathf.Min(p1.z, p2.z));
+                    Vector3Int end = new Vector3Int(Mathf.Max(p1.x, p2.x), Mathf.Max(p1.y, p2.y), Mathf.Max(p1.z, p2.z));
+                    if (start.x < config.minMapLimit.x) start.x = config.minMapLimit.x;
+                    if (start.y < config.minMapLimit.y) start.y = config.minMapLimit.y;
+                    if (start.z < config.minMapLimit.z) start.z = config.minMapLimit.z;
+                    if (end.x > config.maxMapLimit.x) end.x = config.maxMapLimit.x;
+                    if (end.y > config.maxMapLimit.y) end.y = config.maxMapLimit.y;
+                    if (end.z > config.maxMapLimit.z) end.z = config.maxMapLimit.z;
 
-                for (int i = 0; i < 5; i++)
-                {
-                    var err = tilemap.GenerateTile(start, end - start);
-                    if ((err == GenResult.Ok) || (err == GenResult.Conflict))
+                    for (int i = 0; i < 5; i++)
                     {
-                        updated = true;
-                    }
-                    else
-                    {
-                        currentDistance += incDistance;
+                        var err = tilemap.GenerateTile(start, end - start);
+                        if ((err == GenResult.Ok) || (err == GenResult.Conflict))
+                        {
+                            updated = true;
+                        }
+                        else
+                        {
+                            currentDistance += incDistance;
+                        }
+
+                        if (sw.ElapsedMilliseconds > config.maxTimePerFrameMS) break;
                     }
 
                     if (sw.ElapsedMilliseconds > config.maxTimePerFrameMS) break;
                 }
 
-                if (sw.ElapsedMilliseconds > config.maxTimePerFrameMS) break;
-            }
+                sw.Stop();
+                debuglastGenerationTimeMS = sw.ElapsedMilliseconds;
 
-            sw.Stop();
-            debuglastGenerationTimeMS = sw.ElapsedMilliseconds;
-
-            Vector3 localCameraPos = transform.worldToLocalMatrix.MultiplyPoint(dynamicCamera.transform.position);
-            Vector3 localCameraDir = transform.worldToLocalMatrix.MultiplyVector(dynamicCamera.transform.forward); localCameraDir.y = 0; localCameraDir.Normalize();
-            var activeClusters = new List<WFCCluster>(tilemap.currentClusters);
-            foreach (var cluster in tilemap.currentClusters)
-            {
-                // Never destroy persistent clusters (linked to events, basically)
-                if (cluster.persistent) continue;
-
-                // Get cluster world position
-                Vector3 clusterCenter = cluster.basePos;
-                clusterCenter.x = (clusterCenter.x + 0.5f ) * config.gridSize.x * config.clusterSize.x;
-                clusterCenter.y = (clusterCenter.y + 0.5f ) * config.gridSize.y * config.clusterSize.y;
-                clusterCenter.z = (clusterCenter.z + 0.5f ) * config.gridSize.z * config.clusterSize.z;
-
-                Vector3 toClusterCenter = clusterCenter - localCameraPos;
-                float distance = toClusterCenter.magnitude;
-                toClusterCenter /= distance;
-                if (distance > config.fadeOutDistance)
+                Vector3 localCameraPos = transform.worldToLocalMatrix.MultiplyPoint(dynamicCamera.transform.position);
+                Vector3 localCameraDir = transform.worldToLocalMatrix.MultiplyVector(dynamicCamera.transform.forward); localCameraDir.y = 0; localCameraDir.Normalize();
+                var activeClusters = new List<WFCCluster>(tilemap.currentClusters);
+                foreach (var cluster in tilemap.currentClusters)
                 {
-                    if (Vector3.Dot(toClusterCenter, localCameraDir) < -0.25f)
+                    // Never destroy persistent clusters (linked to events, basically)
+                    if (cluster.persistent) continue;
+
+                    // Get cluster world position
+                    Vector3 clusterCenter = cluster.basePos;
+                    clusterCenter.x = (clusterCenter.x + 0.5f) * config.gridSize.x * config.clusterSize.x;
+                    clusterCenter.y = (clusterCenter.y + 0.5f) * config.gridSize.y * config.clusterSize.y;
+                    clusterCenter.z = (clusterCenter.z + 0.5f) * config.gridSize.z * config.clusterSize.z;
+
+                    Vector3 toClusterCenter = clusterCenter - localCameraPos;
+                    float distance = toClusterCenter.magnitude;
+                    toClusterCenter /= distance;
+                    if (distance > config.fadeOutDistance)
                     {
-                        // Remove this cluster
-                        tilemap.RemoveCluster(cluster);
+                        if (Vector3.Dot(toClusterCenter, localCameraDir) < -0.25f)
+                        {
+                            // Remove this cluster
+                            tilemap.RemoveCluster(cluster);
+                        }
                     }
                 }
             }
@@ -1052,8 +1061,8 @@ public class WFCTilemapComponent : MonoBehaviour
     }
 #endif
 
-    private void CreateTile(Vector3 localPosition, Quaternion localRotation, WFCTile3d tilePrefab, WFCCluster cluster, Action<WFCTile3d> onComplete)
-    {
+    public void CreateTile(Vector3 localPosition, Quaternion localRotation, WFCTile3d tilePrefab, WFCCluster cluster, Action<WFCTile3d> onComplete)
+    {        
         if (clusterObjects.TryGetValue(cluster, out Transform container))
         {
             var tilePos = WorldToTilePos(localPosition);
@@ -1080,7 +1089,7 @@ public class WFCTilemapComponent : MonoBehaviour
         }
     }
 
-    private void DestroyTile(WFCTile3d tile)
+    public void DestroyTile(WFCTile3d tile)
     {
         if ((usePooling) && (poolingContainer))
         {
@@ -1100,7 +1109,7 @@ public class WFCTilemapComponent : MonoBehaviour
         Debug.Log("Destroy tile");
     }
 
-    private void CreateCluster(WFCCluster cluster)
+    public void CreateCluster(WFCCluster cluster)
     {
         // Check if this cluster is already present for warning
         if (clusterObjects.TryGetValue(cluster, out Transform container))
@@ -1120,7 +1129,7 @@ public class WFCTilemapComponent : MonoBehaviour
         onNewCluster?.Invoke(cluster);
     }
 
-    private void DestroyCluster(WFCCluster cluster)
+    public void DestroyCluster(WFCCluster cluster)
     {
         if (!clusterObjects.TryGetValue(cluster, out Transform container))
         {
@@ -1154,6 +1163,8 @@ public class WFCTilemapComponent : MonoBehaviour
     void AddToPool(WFCTile3d tile)
     {
         if (objectPool == null) ResetObjectPool();
+
+        if (tile == null) return;
 
         tile.gameObject.SetActive(false);
         tile.name = "Pooled Tile";
@@ -1192,6 +1203,33 @@ public class WFCTilemapComponent : MonoBehaviour
             {
                 AddToPool(p);
             }
+        }
+    }
+
+    void SetupHandlers()
+    {
+        if ((config.multithreaded) && (mode == Mode.GenerateData) && (thread != null))
+        {
+            tilemap.createTileCallback = thread.CreateTile;
+            tilemap.destroyTileCallback = thread.DestroyTile;
+            tilemap.createClusterCallback = thread.CreateCluster;
+            tilemap.destroyClusterCallback = thread.DestroyCluster;
+        }
+        else
+        {
+            tilemap.createTileCallback = CreateTile;
+            tilemap.destroyTileCallback = DestroyTile;
+            tilemap.createClusterCallback = CreateCluster;
+            tilemap.destroyClusterCallback = DestroyCluster;
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        if (thread != null)
+        {
+            thread.SetExit(true, true);
+            thread = null;
         }
     }
 }

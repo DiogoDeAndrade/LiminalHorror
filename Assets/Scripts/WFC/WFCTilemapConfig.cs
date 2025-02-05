@@ -28,10 +28,12 @@ public class WFCTilemapConfig : ScriptableObject
     [ShowIf(nameof(isDynamicGen)), HideInInspector]
     public Matrix4x4 cameraMatrix;
     [ShowIf(nameof(isDynamicGen)), Header("Dynamic Generation Parameters")]
+    public bool multithreaded = false;
+    [ShowIf(nameof(isDynamicGen))]
     public float maxGenerationDistance = 50;
     [ShowIf(nameof(isDynamicGen))]
     public float fadeOutDistance = 10;
-    [ShowIf(nameof(isDynamicGen))]
+    [ShowIf(nameof(isDynamicGenAndNotMultithreaded))]
     public float maxTimePerFrameMS = 15.0f;
     [ShowIf(nameof(isDynamicGen))]
     public bool buildNavmesh = false;
@@ -41,6 +43,7 @@ public class WFCTilemapConfig : ScriptableObject
     bool displayAdjacencyData => tilemapData == null;
     bool canGen => adjacencyData != null;
     bool isDynamicGen => canGen && dynamicUpdate;
+    bool isDynamicGenAndNotMultithreaded => isDynamicGen && !multithreaded;
 
 
     private List<WFCAdjacencyData>  adjacencyInfo;

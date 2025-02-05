@@ -151,9 +151,10 @@ public class WFCTilemap
     public CreateClusterCallback    createClusterCallback;
     public CreateClusterCallback    destroyClusterCallback;
 
-    WFCTilemapConfig _config;
+    WFCTilemapConfig                    _config;
     List<WFCTile3d>                     conflictTiles;
     Dictionary<Vector3Int, WFCCluster>  clusters = new Dictionary<Vector3Int, WFCCluster>();
+    System.Random                       randomGenerator = new System.Random();
 
     public WFCTilemapConfig             config => _config;
 
@@ -200,9 +201,9 @@ public class WFCTilemap
                 if ((conflictTiles != null) && (conflictTiles.Count > 0))
                 {
                     // Resolve this one - set map to one of the conflict tiles
-                    WFCTile3d tile = conflictTiles.Random();
+                    WFCTile3d tile = conflictTiles.Random(randomGenerator);
                     int localClusterIndex = TilePosToClusterIndex(WorldToClusterPosIndex(worldTilePos));
-                    cluster.SetTile(localClusterIndex, new Tile() { tileId = _config.tileset.GetTileIndex(tile), rotation = (byte)UnityEngine.Random.Range(0, 3) });
+                    cluster.SetTile(localClusterIndex, new Tile() { tileId = _config.tileset.GetTileIndex(tile), rotation = (byte)(randomGenerator.Next() % 4) });
                     CreateTile(worldTilePos.x, worldTilePos.y, worldTilePos.z);
                 }
             };
@@ -389,12 +390,7 @@ public class WFCTilemap
 
         var tile = cluster.GetWFCTile(localClusterIndex);
 
-        return tile.probMap.Get();
-    }
-
-    internal GenResult GenerateTile(Vector3 cameraPos, Quaternion cameraDir, float fov, float aspect, float near, float far)
-    {
-        return GenerateTile(() => GetLowestEntropyIndex(cameraPos, cameraDir, fov, aspect, near, far));
+        return tile.probMap.Get(randomGenerator);
     }
 
     internal GenResult GenerateTile(Vector3Int startPos, Vector3Int size)
@@ -434,7 +430,7 @@ public class WFCTilemap
 
         var t = cluster.GetWFCTile(localClusterIndex);
 
-        Tile newTile = t.probMap.Get();
+        Tile newTile = t.probMap.Get(randomGenerator);
         if (newTile == null) return GenResult.Ok;
 
         return GenerateTile(x, y, z, newTile);
@@ -532,8 +528,8 @@ public class WFCTilemap
                 if ((conflictTiles != null) && (conflictTiles.Count > 0))
                 {
                     // Resolve this one - set map to one of the conflict tiles
-                    WFCTile3d tile = conflictTiles.Random();
-                    cluster.SetTile(localClusterIndex, new Tile() { tileId = _config.GetTileIndex(tile), rotation = (byte)UnityEngine.Random.Range(0, 3) });
+                    WFCTile3d tile = conflictTiles.Random(randomGenerator);
+                    cluster.SetTile(localClusterIndex, new Tile() { tileId = _config.GetTileIndex(tile), rotation = (byte)(randomGenerator.Next() % 4) });
                     CreateTile(x, y, z);
                 }
                 else
@@ -585,156 +581,6 @@ public class WFCTilemap
         return ret;
     }
 
-    Vector3Int? GetLowestEntropyIndex(Vector3 cameraPos, Quaternion cameraDir, float fov, float aspect, float near, float far)
-    {
-        throw(new NotImplementedException());
-
-        // Problems here because we might have a transformation on the object itself that has to be considered for the camera setup
-/*        Vector3 TileToWorldPos(Vector3Int tilePos)
-        {
-            Vector3 localPos = new Vector3(
-                tilePos.x * gridSize.x,
-                tilePos.y * gridSize.y,
-                tilePos.z * gridSize.z
-            );
-
-            return container.TransformPoint(localPos);
-        }
-
-        static Vector3[] GetFrustumCorners(Vector3 cameraPos, Quaternion cameraDir, float fov, float aspect, float near, float far)
-        {
-            // Calculate the height and width of the near and far planes
-            float halfFov = Mathf.Deg2Rad * fov * 0.5f;
-            float nearHeight = 2.0f * Mathf.Tan(halfFov) * near;
-            float nearWidth = nearHeight * aspect;
-            float farHeight = 2.0f * Mathf.Tan(halfFov) * far;
-            float farWidth = farHeight * aspect;
-
-            // Frustum corners in camera space
-            Vector3[] frustumCorners = new Vector3[8];
-
-            // Near plane corners (relative to camera position)
-            frustumCorners[0] = new Vector3(-nearWidth * 0.5f, -nearHeight * 0.5f, near);  // Bottom-left
-            frustumCorners[1] = new Vector3(nearWidth * 0.5f, -nearHeight * 0.5f, near);   // Bottom-right
-            frustumCorners[2] = new Vector3(nearWidth * 0.5f, nearHeight * 0.5f, near);    // Top-right
-            frustumCorners[3] = new Vector3(-nearWidth * 0.5f, nearHeight * 0.5f, near);   // Top-left
-
-            // Far plane corners (relative to camera position)
-            frustumCorners[4] = new Vector3(-farWidth * 0.5f, -farHeight * 0.5f, far);     // Bottom-left
-            frustumCorners[5] = new Vector3(farWidth * 0.5f, -farHeight * 0.5f, far);      // Bottom-right
-            frustumCorners[6] = new Vector3(farWidth * 0.5f, farHeight * 0.5f, far);       // Top-right
-            frustumCorners[7] = new Vector3(-farWidth * 0.5f, farHeight * 0.5f, far);      // Top-left
-
-            // Convert from camera space to world space
-            for (int i = 0; i < frustumCorners.Length; i++)
-            {
-                frustumCorners[i] = cameraDir * frustumCorners[i];  // Apply camera rotation
-                frustumCorners[i] += cameraPos;  // Translate to camera position in world space
-            }
-
-            return frustumCorners;
-        }
-
-        Vector3Int WorldToTilePos(Vector3 worldPos)
-        {
-            Vector3 localPos = container.worldToLocalMatrix.MultiplyPoint3x4(worldPos);
-
-            Vector3Int tilePos = Vector3Int.zero;
-            tilePos.x = Mathf.FloorToInt(localPos.x / gridSize.x);
-            tilePos.y = Mathf.FloorToInt(localPos.y / gridSize.y);
-            tilePos.z = Mathf.FloorToInt(localPos.z / gridSize.z);
-
-            return tilePos;
-        }
-
-        void GetTileBoundsFromFrustum(Vector3 cameraPos, Quaternion cameraDir, float fov, float aspect, float near, float far, out Vector3Int minTile, out Vector3Int maxTile)
-        {
-            // Get frustum corners
-            Vector3[] frustumCorners = GetFrustumCorners(cameraPos, cameraDir, fov, aspect, near, far);
-
-            // Initialize min and max tile positions
-            minTile = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
-            maxTile = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
-
-            // Iterate over each frustum corner
-            foreach (var corner in frustumCorners)
-            {
-                // Convert world-space corner to tile coordinates
-                Vector3Int tileCoord = WorldToTilePos(corner);
-
-                // Update min and max bounds
-                minTile = Vector3Int.Min(minTile, tileCoord);
-                maxTile = Vector3Int.Max(maxTile, tileCoord);
-            }
-        }
-
-        Plane[] CalculateFrustumPlanes(Vector3 cameraPos, Quaternion cameraDir, float fov, float aspect, float near, float far)
-        {
-            // Step 1: Create the perspective projection matrix
-            Matrix4x4 projectionMatrix = Matrix4x4.Perspective(fov, aspect, near, far);
-
-            // Step 2: Create the view matrix by inverting the camera's transformation matrix
-            Matrix4x4 viewMatrix = Matrix4x4.TRS(cameraPos, cameraDir, Vector3.one).inverse;
-
-            // Step 3: Combine the projection and view matrices into a single matrix
-            Matrix4x4 viewProjectionMatrix = projectionMatrix * viewMatrix;
-
-            // Step 4: Calculate frustum planes from the view-projection matrix
-            Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix);
-
-            return frustumPlanes;
-        }
-
-        List<Vector3Int> possibilities = new List<Vector3Int>();
-        int minOptions = int.MaxValue;
-
-        // Get frustum planes
-        Plane[] frustumPlanes = CalculateFrustumPlanes(cameraPos, cameraDir, fov, aspect, near, far);
-
-        // Determine the bounding box of tiles the frustum could intersect
-        Vector3Int minTile, maxTile;
-        GetTileBoundsFromFrustum(cameraPos, cameraDir, fov, aspect, near, far, out minTile, out maxTile);
-
-        // Iterate over the tile coordinates in the potential frustum bounds
-        for (int z = minTile.z; z <= maxTile.z; z++)
-        {
-            for (int y = minTile.y; y <= maxTile.y; y++)
-            {
-                for (int x = minTile.x; x <= maxTile.x; x++)
-                {
-                    Vector3Int tilePos = new Vector3Int(x, y, z);
-                    Vector3 worldPos = TileToWorldPos(tilePos);
-
-                    // Check if the tile's center point is inside the frustum
-                    if (GeometryUtility.TestPlanesAABB(frustumPlanes, new Bounds(worldPos, gridSize)))
-                    {
-                        // This tile is inside the frustum, so check its entropy
-                        (WFCCluster cluster, Vector3Int localPos) = WorldToClusterPos(x, y, z);
-
-                        int localClusterIndex = TilePosToClusterIndex(localPos);
-
-                        var tile = cluster.GetWFCTile(localClusterIndex);
-
-                        if (tile.probMap == null) continue;
-
-                        if (tile.probMap.Count < minOptions)
-                        {
-                            possibilities.Clear();
-                            possibilities.Add(new Vector3Int(x, y, z));
-                            minOptions = tile.probMap.Count;
-                        }
-                        else if (tile.probMap.Count == minOptions)
-                        {
-                            possibilities.Add(new Vector3Int(x, y, z));
-                        }
-                    }
-                }
-            }
-        }
-
-        return (possibilities.Count > 0) ? (possibilities.Random()) : null;*/
-    }
-
     Vector3Int? GetLowestEntropyIndex(Vector3Int startPos, Vector3Int size)
     {
         List<Vector3Int>    possibilities = new List<Vector3Int>();
@@ -768,7 +614,7 @@ public class WFCTilemap
             }
         }
 
-        return (possibilities.Count > 0) ? (possibilities.Random()) : null;
+        return (possibilities.Count > 0) ? (possibilities.Random(randomGenerator)) : null;
     }
 
     internal void Set(Vector3Int worldPos, Tile t)

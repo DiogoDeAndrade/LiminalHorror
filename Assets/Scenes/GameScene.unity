@@ -13196,7 +13196,7 @@ MonoBehaviour:
   gameOver: {fileID: 643164946}
   toBeContinued: {fileID: 1854744603}
   gameOverScream: {fileID: 8300000, guid: e7da392158be4dc449bba6b457d3b2de, type: 3}
-  titleScene: Title
+  titleScene: TitleScene
 --- !u!114 &269509603
 MonoBehaviour:
   m_ObjectHideFlags: 0
