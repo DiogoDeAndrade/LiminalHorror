@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// This holds a list of tiles to be used in a tilemap
+// Currently, a maximum number of 256 tiles are supported, changes will have to be made in this class
+// and others to support more than 256 tiles
 [CreateAssetMenu(fileName = "WFCTileset", menuName = "WFC/Tileset")]
 public class WFCTileset : ScriptableObject
 {

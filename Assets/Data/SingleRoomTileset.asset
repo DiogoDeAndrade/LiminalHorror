@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 45059e131381dee47bcf2472e93806c7, type: 3}
+  m_Name: SingleRoomTileset
+  m_EditorClassIdentifier: 
+  tilePrefabs:
+  - {fileID: 0}
+  - {fileID: 2039425820839826629, guid: 7b648a3e3c9483c4d98f9fbb3950b61a, type: 3}
+  - {fileID: 6087844442028194174, guid: bc765b5b912542043809ed4c7dac2e9b, type: 3}
+  - {fileID: 7303238477717951983, guid: 0eff645194d6a9a4187f3cb50510f5b8, type: 3}
+  - {fileID: 5578511477279080810, guid: 98a070a7aaef54046a8ffcc4ff5391de, type: 3}
+  - {fileID: 2526964003333933981, guid: f7af48fd3c83e9a49ad3a2f9d267e25e, type: 3}

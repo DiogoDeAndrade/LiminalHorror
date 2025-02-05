@@ -22,7 +22,7 @@ public class Level0_PhoneEvent : TerrorObject
     [SerializeField]
     private LayerMask   excludeLayers;    
 
-    private WFCTileData.Cluster phoneCluster;
+    private WFCCluster          phoneCluster;
     private bool                firstLOS = false;
     private Coroutine           nextLevelCR;
 
@@ -81,23 +81,24 @@ public class Level0_PhoneEvent : TerrorObject
         }
     }
 
-    public void GenerateCluster(WFCTileData.Cluster cluster)
+    public void GenerateCluster(WFCCluster cluster)
     {
         phoneCluster = cluster;
         phoneCluster.persistent = true;
 
-        transform.SetParent(phoneCluster.container, true);
+        transform.SetParent(tilemap.GetClusterTransform(phoneCluster), true);
 
         tilemap.onNewCluster -= GenerateCluster;
 
-        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((cluster.basePos.x + 0.5f) * cluster.clusterSize.x),
-                                              cluster.basePos.y * cluster.clusterSize.y,
-                                              Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.clusterSize.z));
+        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((cluster.basePos.x + 0.5f) * cluster.config.clusterSize.x),
+                                              cluster.basePos.y * cluster.config.clusterSize.y,
+                                              Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.config.clusterSize.z));
         ClearArea(centerPos, 2);
 
-        transform.position = new Vector3(centerPos.x * tilemap.gridSize.x,
-                                         centerPos.y * tilemap.gridSize.y,
-                                         centerPos.z * tilemap.gridSize.z);
+        var gridSize = tilemap.gridSize;
+        transform.position = new Vector3(centerPos.x * gridSize.x,
+                                         centerPos.y * gridSize.y,
+                                         centerPos.z * gridSize.z);
         actualObjects.SetActive(true);
 
         ringSound.Play();

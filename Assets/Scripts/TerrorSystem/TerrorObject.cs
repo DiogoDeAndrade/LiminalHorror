@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class TerrorObject : MonoBehaviour
 {
-    protected WFCTilemap tilemap;
+    protected WFCTilemapComponent tilemap;
     protected FPSController player;
     protected TerrorManager terrorManager;
 
     protected virtual void Start()
     {
-        tilemap = FindAnyObjectByType<WFCTilemap>();
+        tilemap = FindAnyObjectByType<WFCTilemapComponent>();
         player = FindAnyObjectByType<FPSController>();
         terrorManager = FindAnyObjectByType<TerrorManager>();
     }

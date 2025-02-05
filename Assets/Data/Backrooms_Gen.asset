@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abd10ed0465fcb34cbdec7262e139e14, type: 3}
+  m_Name: Backrooms_Gen
+  m_EditorClassIdentifier: 
+  gridSize: {x: 2, y: 2.5, z: 2}
+  mapSize: {x: 21, y: 1, z: 16}
+  localBounds:
+    m_Center: {x: 21, y: 1.25, z: 16}
+    m_Extent: {x: 21, y: 1.25, z: 16}
+  tilemapData: {fileID: 0}
+  adjacencyData: {fileID: 4900000, guid: dfee9758b97cf6c4e91dde1bc3ecba63, type: 3}
+  tileset: {fileID: 11400000, guid: 6c0a460003905074a8a714ba0c31ccd3, type: 2}
+  maxDepth: 25
+  minMapLimit: {x: -10000, y: 0, z: -10000}
+  maxMapLimit: {x: 10000, y: 1, z: 10000}
+  clusterSize: {x: 8, y: 1, z: 8}
+  dynamicUpdate: 1
+  cameraMatrix:
+    e00: 0
+    e01: 0
+    e02: 0
+    e03: 0
+    e10: 0
+    e11: 0
+    e12: 0
+    e13: 0
+    e20: 0
+    e21: 0
+    e22: 0
+    e23: 0
+    e30: 0
+    e31: 0
+    e32: 0
+    e33: 0
+  maxGenerationDistance: 50
+  fadeOutDistance: 10
+  maxTimePerFrameMS: 25
+  buildNavmesh: 0

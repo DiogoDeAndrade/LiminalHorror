@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using OkapiKit;
 
 public class Level0_EventBlackout : TerrorObject
 {

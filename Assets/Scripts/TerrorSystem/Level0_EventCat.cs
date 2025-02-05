@@ -2,6 +2,7 @@ using NaughtyAttributes;
 using OkapiKit;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public class Level0_EventCat : TerrorObject
 {
@@ -23,7 +24,7 @@ public class Level0_EventCat : TerrorObject
     Sprite         audioIconSprite;
 
     float                   meowTimer;
-    WFCTileData.Cluster     catCluster;
+    WFCCluster              catCluster;
     Coroutine               deathCR;
 
     protected override void Start()
@@ -89,18 +90,18 @@ public class Level0_EventCat : TerrorObject
         }
     }
 
-    public void GenerateCatCluster(WFCTileData.Cluster cluster)
+    public void GenerateCatCluster(WFCCluster cluster)
     {
         catCluster = cluster;
         catCluster.persistent = true;
 
-        transform.SetParent(catCluster.container, true);
+        transform.SetParent(tilemap.GetClusterTransform(cluster), true);
 
         tilemap.onNewCluster -= GenerateCatCluster;
 
-        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((cluster.basePos.x + 0.5f) * cluster.clusterSize.x),
-                                              cluster.basePos.y * cluster.clusterSize.y,
-                                              Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.clusterSize.z));
+        Vector3Int centerPos = new Vector3Int(Mathf.FloorToInt((cluster.basePos.x + 0.5f) * cluster.config.clusterSize.x),
+                                              cluster.basePos.y * cluster.config.clusterSize.y,
+                                              Mathf.FloorToInt((cluster.basePos.z + 0.5f) * cluster.config.clusterSize.z));
         ClearArea(centerPos, 2);
 
         transform.position = new Vector3(centerPos.x * tilemap.gridSize.x,

@@ -1,11 +1,15 @@
-using UnityEngine;
-using NaughtyAttributes;
 using System;
+using UnityEngine;
+
+// Represents a single instanced tile in the game world
+// This is used mainly for building the adjacency rules and identify the tiles for the tileset
 
 public class WFCTile3d : MonoBehaviour
 {
-    private Bounds tileBound;
-    private bool   tileBoundInit = false;
+    public WFCTile3d    sourcePrefabObject;
+
+    private Bounds      tileBound;
+    private bool        tileBoundInit = false;
 
     public Bounds GetExtents()
     {

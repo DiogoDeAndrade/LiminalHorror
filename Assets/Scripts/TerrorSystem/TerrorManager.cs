@@ -1,5 +1,4 @@
 using NaughtyAttributes;
-using OkapiKit;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -12,7 +11,7 @@ public class TerrorManager : MonoBehaviour
     [SerializeField] private AudioClip     gameOverScream;
     [SerializeField, Scene] private string titleScene;
 
-    WFCTilemap          tilemap;
+    WFCTilemapComponent          tilemap;
     CharacterController charCtrl;
     Coroutine           fadeCR;
 
@@ -20,7 +19,7 @@ public class TerrorManager : MonoBehaviour
 
     void Start()
     {
-        tilemap = FindAnyObjectByType<WFCTilemap>();
+        tilemap = FindAnyObjectByType<WFCTilemapComponent>();
         charCtrl = player.GetComponent<CharacterController>();
 
         gameOver.alpha = 0.0f;
