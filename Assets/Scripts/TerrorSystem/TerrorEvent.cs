@@ -1,7 +1,6 @@
 using NaughtyAttributes;
-using OkapiKit;
 using UnityEngine;
-
+using UC;
 public class TerrorEvent : MonoBehaviour
 {
     public enum TriggerType { Time, DistanceWalked };

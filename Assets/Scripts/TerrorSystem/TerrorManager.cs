@@ -2,7 +2,7 @@ using NaughtyAttributes;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
+using UC;
 public class TerrorManager : MonoBehaviour
 {
     [SerializeField] private FPSController player;

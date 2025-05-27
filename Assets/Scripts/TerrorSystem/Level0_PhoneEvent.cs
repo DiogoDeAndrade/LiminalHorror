@@ -1,8 +1,6 @@
-using OkapiKit;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-
+using UC;
 public class Level0_PhoneEvent : TerrorObject
 {
     [SerializeField]

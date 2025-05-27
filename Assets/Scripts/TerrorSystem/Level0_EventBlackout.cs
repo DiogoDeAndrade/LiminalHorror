@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-
+using UC;
 public class Level0_EventBlackout : TerrorObject
 {
     [SerializeField] private float      radius = 20.0f;

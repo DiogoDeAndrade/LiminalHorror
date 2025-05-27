@@ -9,11 +9,9 @@ using Unity.AI.Navigation;
 using NaughtyAttributes;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
-using static UnityEngine.Rendering.STP;
 using UnityEngine.UI;
-using OkapiKit;
 using System;
-using System.Threading;
+using UC;
 
 // This class bridges the generic WFC classes with Unity's system
 // Although the WFC classes use some Unity data structures, like Vector3, etc

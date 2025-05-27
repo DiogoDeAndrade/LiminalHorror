@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UC;
 
 public class SoundEvent : TerrorObject
 {

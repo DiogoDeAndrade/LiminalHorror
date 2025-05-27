@@ -43,7 +43,7 @@ MonoBehaviour:
     e32: 0
     e33: 0
   multithreaded: 1
-  maxGenerationDistance: 50
+  maxGenerationDistance: 100
   fadeOutDistance: 20
   maxTimePerFrameMS: 25
   buildNavmesh: 0

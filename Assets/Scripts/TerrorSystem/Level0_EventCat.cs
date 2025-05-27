@@ -1,8 +1,7 @@
 using NaughtyAttributes;
-using OkapiKit;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.Tilemaps;
+using UC;
 
 public class Level0_EventCat : TerrorObject
 {

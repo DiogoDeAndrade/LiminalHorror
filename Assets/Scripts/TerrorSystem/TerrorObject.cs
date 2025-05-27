@@ -1,5 +1,5 @@
 using UnityEngine;
-
+using UC;
 public class TerrorObject : MonoBehaviour
 {
     protected WFCTilemapComponent tilemap;

@@ -2,6 +2,7 @@ using UnityEngine;
 using NaughtyAttributes;
 using System.Collections.Generic;
 using System.IO;
+using UC;
 
 [CreateAssetMenu(fileName = "WFCTilemapConfig", menuName = "WFC/Tilemap Config")]
 public class WFCTilemapConfig : ScriptableObject
